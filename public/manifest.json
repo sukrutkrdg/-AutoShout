@@ -1,0 +1,55 @@
+{
+  "name": "AutoShout",
+  "short_name": "AutoShout",
+  "description": "Automated Farcaster post scheduling app - Schedule your casts to be automatically published at your desired date and time",
+  "version": "1.0.0",
+  "author": "AutoShout Team",
+  "categories": ["social", "productivity", "automation"],
+  "icon": "/assets/generated/autoshout-logo-transparent.dim_200x200.png",
+  "splash_screen": {
+    "image": "/assets/generated/dashboard-mockup.dim_800x600.png",
+    "background_color": "#8b5cf6"
+  },
+  "theme_color": "#8b5cf6",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "permissions": [
+    "farcaster:read",
+    "farcaster:write",
+    "base:transactions"
+  ],
+  "farcaster": {
+    "frame_version": "next",
+    "supports_composer": true,
+    "supports_actions": true,
+    "webhook_url": "https://your-domain.com/api/farcaster/webhook"
+  },
+  "blockchain": {
+    "network": "base",
+    "chain_id": 8453,
+    "contract_address": "0x0000000000000000000000000000000000000000",
+    "supported_chains": [8453, 84532]
+  },
+  "screenshots": [
+    {
+      "src": "/assets/generated/dashboard-mockup.dim_800x600.png",
+      "type": "image/png",
+      "sizes": "800x600",
+      "label": "Dashboard View"
+    },
+    {
+      "src": "/assets/generated/calendar-illustration.dim_600x400.png",
+      "type": "image/png",
+      "sizes": "600x400",
+      "label": "Calendar View"
+    }
+  ],
+  "links": {
+    "privacy_policy": "https://your-domain.com/privacy",
+    "terms_of_service": "https://your-domain.com/terms",
+    "support": "https://your-domain.com/support"
+  }
+}
