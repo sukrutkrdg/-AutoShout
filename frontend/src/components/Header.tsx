@@ -1,25 +1,18 @@
-import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { useGetCallerUserProfile } from '../hooks/useQueries';
-import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { FarcasterUser } from '../lib/farcaster';
 
-export default function Header() {
-  const { identity, clear, login, loginStatus } = useInternetIdentity();
+interface HeaderProps {
+    user: FarcasterUser | null;
+}
+
+export default function Header({ user }: HeaderProps) {
   const { data: userProfile } = useGetCallerUserProfile();
-  const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
-
-  const isAuthenticated = !!identity;
-  const isLoggingIn = loginStatus === 'logging-in';
-
-  const handleLogout = async () => {
-    await clear();
-    queryClient.clear();
-  };
 
   const getInitials = (name: string) => {
     return name
@@ -34,7 +27,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-3">
-          <img src="/assets/generated/autoshout-logo-transparent.dim_200x200.png" alt="AutoShout" className="h-10 w-10" />
+          {/* Logo varsa buraya */}
           <div>
             <h1 className="text-xl font-bold">AutoShout</h1>
             <p className="text-xs text-muted-foreground">Farcaster Scheduler</p>
@@ -52,13 +45,14 @@ export default function Header() {
             <span className="sr-only">Toggle theme</span>
           </Button>
 
-          {isAuthenticated ? (
+          {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar>
+                    <AvatarImage src={user.pfpUrl} alt={user.displayName} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {userProfile ? getInitials(userProfile.name) : 'U'}
+                      {userProfile ? getInitials(userProfile.name) : getInitials(user.displayName || 'U')}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -66,8 +60,8 @@ export default function Header() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{userProfile?.name || 'User'}</p>
-                    <p className="text-xs text-muted-foreground">@{userProfile?.farcasterHandle || 'username'}</p>
+                    <p className="text-sm font-medium">{user.displayName}</p>
+                    <p className="text-xs text-muted-foreground">@{user.username}</p>
                     {userProfile?.isPremium && (
                       <span className="inline-flex w-fit items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         Premium
@@ -76,16 +70,9 @@ export default function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
-                </DropdownMenuItem>
+                {/* Mini App'te çıkış yap butonu genelde gerekmez ama eklenebilir */}
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : (
-            <Button onClick={login} disabled={isLoggingIn}>
-              {isLoggingIn ? 'Logging in...' : 'Login'}
-            </Button>
           )}
         </div>
       </div>

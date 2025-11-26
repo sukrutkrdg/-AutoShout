@@ -1,143 +1,161 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useActor } from './useActor';
-import type { UserProfile, ScheduledPost, PostStatus } from '../backend';
 import { toast } from 'sonner';
+import { ScheduledPost, UserProfile, PostStatus } from '../lib/types';
+import { initFarcaster } from '../lib/farcaster';
+
+// --- MOCK DATABASE (LocalStorage) ---
+// Bu kısım ileride Supabase veya kendi API'n ile değişecek.
+const DB_KEYS = {
+  POSTS: 'autoshout_posts',
+  PROFILE: 'autoshout_profile'
+};
+
+const mockDb = {
+  getPosts: async (fid: number): Promise<ScheduledPost[]> => {
+    // Gerçek API çağrısı simülasyonu (gecikme)
+    await new Promise(r => setTimeout(r, 500));
+    const allPosts = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    return allPosts.filter((p: any) => p.userId === fid);
+  },
+  
+  addPost: async (post: ScheduledPost) => {
+    await new Promise(r => setTimeout(r, 500));
+    const posts = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    posts.push(post);
+    localStorage.setItem(DB_KEYS.POSTS, JSON.stringify(posts));
+  },
+
+  deletePost: async (id: string) => {
+    await new Promise(r => setTimeout(r, 500));
+    let posts = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    posts = posts.filter((p: any) => p.id !== id);
+    localStorage.setItem(DB_KEYS.POSTS, JSON.stringify(posts));
+  },
+
+  getProfile: async (fid: number): Promise<UserProfile | null> => {
+    const profiles = JSON.parse(localStorage.getItem(DB_KEYS.PROFILE) || '{}');
+    returnWZ profiles[fid] || null;
+  },
+
+  saveProfile: async (fid: number, profile: UserProfile) => {
+    const profiles = JSON.parse(localStorage.getItem(DB_KEYS.PROFILE) || '{}');
+    profiles[fid] = profile;
+    localStorage.setItem(DB_KEYS.PROFILE, JSON.stringify(profiles));
+  }
+};
+
+// --- HOOKS ---
+
+// Mevcut Farcaster kullanıcısının FID'sini almak için yardımcı
+async function getCurrentFid(): Promise<number> {
+    const user = await initFarcaster();
+    if (!user) throw new Error("Kullanıcı oturumu bulunamadı");
+    return user.fid;
+}
 
 export function useGetCallerUserProfile() {
-  const { actor, isFetching: actorFetching } = useActor();
-
-  const query = useQuery<UserProfile | null>({
+  return useQuery({
     queryKey: ['currentUserProfile'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getCallerUserProfile();
+      const fid = await getCurrentFid();
+      return mockDb.getProfile(fid);
     },
-    enabled: !!actor && !actorFetching,
     retry: false,
   });
-
-  return {
-    ...query,
-    isLoading: actorFetching || query.isLoading,
-    isFetched: !!actor && query.isFetched,
-  };
 }
 
 export function useSaveCallerUserProfile() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
-      if (!actor) throw new Error('Actor not available');
-      await actor.saveCallerUserProfile(profile);
+      const fid = await getCurrentFid();
+      await mockDb.saveProfile(fid, profile);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-      toast.success('Profile saved successfully');
+      toast.success('Profil kaydedildi');
     },
     onError: (error: Error) => {
-      toast.error('Failed to save profile: ' + error.message);
+      toast.error('Hata: ' + error.message);
     },
   });
 }
 
 export function useGetUserScheduledPosts() {
-  const { actor, isFetching: actorFetching } = useActor();
-
-  return useQuery<ScheduledPost[]>({
+  return useQuery({
     queryKey: ['userScheduledPosts'],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getUserScheduledPosts();
+        try {
+            const fid = await getCurrentFid();
+            return mockDb.getPosts(fid);
+        } catch (e) {
+            return [];
+        }
     },
-    enabled: !!actor && !actorFetching,
   });
 }
 
 export function useCreateScheduledPost() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (post: ScheduledPost) => {
-      if (!actor) throw new Error('Actor not available');
-      await actor.createScheduledPost(post);
+      // FID kontrolü
+      const fid = await getCurrentFid();
+      post.userId = fid; // Postun sahibini garantiye al
+      await mockDb.addPost(post);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
       queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
-      toast.success('Post scheduled successfully');
+      toast.success('Post başarıyla planlandı');
     },
     onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}
-
-export function useUpdateScheduledPost() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (post: ScheduledPost) => {
-      if (!actor) throw new Error('Actor not available');
-      await actor.updateScheduledPost(post);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
-      toast.success('Post updated');
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to update post: ' + error.message);
+      toast.error('Hata: ' + error.message);
     },
   });
 }
 
 export function useDeleteScheduledPost() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      if (!actor) throw new Error('Actor not available');
-      await actor.deleteScheduledPost(id);
+      await mockDb.deletePost(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
       queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
-      toast.success('Post deleted');
+      toast.success('Post silindi');
     },
     onError: (error: Error) => {
-      toast.error('Failed to delete post: ' + error.message);
+      toast.error('Silinirken hata oluştu: ' + error.message);
     },
   });
 }
 
 export function useGetWeeklyPostCount() {
-  const { actor, isFetching: actorFetching } = useActor();
-
-  return useQuery<bigint>({
+  return useQuery({
     queryKey: ['weeklyPostCount'],
     queryFn: async () => {
-      if (!actor) return BigInt(0);
-      return actor.getWeeklyPostCount();
+        const fid = await getCurrentFid();
+        const posts = await mockDb.getPosts(fid);
+        // Basit bir haftalık filtreleme mantığı (Şimdilik tümünü sayıyor)
+        return BigInt(posts.length); 
     },
-    enabled: !!actor && !actorFetching,
   });
 }
 
 export function useGetRemainingWeeklyPosts() {
-  const { actor, isFetching: actorFetching } = useActor();
-
-  return useQuery<bigint>({
+  return useQuery({
     queryKey: ['remainingWeeklyPosts'],
     queryFn: async () => {
-      if (!actor) return BigInt(0);
-      return actor.getRemainingWeeklyPosts();
+        const fid = await getCurrentFid();
+        const posts = await mockDb.getPosts(fid);
+        return BigInt(10 - posts.length); // Örnek limit: 10
     },
-    enabled: !!actor && !actorFetching,
   });
 }

@@ -7,7 +7,8 @@ import { Calendar, Clock, CheckCircle2, XCircle, Plus, Zap } from 'lucide-react'
 import PostScheduler from '../components/PostScheduler';
 import PostsList from '../components/PostsList';
 import CalendarView from '../components/CalendarView';
-import { PostStatus } from '../backend';
+import { PostStatus } from '../lib/types';
+import { FarcasterUser } from '../lib/farcaster'; // Dashboard props için gerekebilir
 
 export default function Dashboard() {
   const { data: userProfile } = useGetCallerUserProfile();

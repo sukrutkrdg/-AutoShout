@@ -1,21 +1,18 @@
 import { useState } from 'react';
 import { useCreateScheduledPost } from '../hooks/useQueries';
-import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Loader2, Upload, X } from 'lucide-react';
-import { PostStatus } from '../backend';
-import { ExternalBlob } from '../backend';
 
 interface PostSchedulerProps {
   onClose: () => void;
 }
 
 export default function PostScheduler({ onClose }: PostSchedulerProps) {
-  const { identity } = useInternetIdentity();
+  // Identity hook'unu kaldırdık
   const createPost = useCreateScheduledPost();
   const [content, setContent] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -42,28 +39,25 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || !scheduledDate || !scheduledTime || !identity) return;
+    if (!content.trim() || !scheduledDate || !scheduledTime) return;
 
     const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
-    const scheduledTimeNano = BigInt(dateTime.getTime() * 1_000_000);
+    // Basit timestamp kullanıyoruz artık, BigInt nano saniye yerine ms
+    const scheduledTimeMs = dateTime.getTime();
 
-    let mediaBlob: ExternalBlob | undefined;
-    if (mediaFile) {
-      const arrayBuffer = await mediaFile.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      mediaBlob = ExternalBlob.fromBytes(uint8Array);
-    }
+    // Media blob işlemi şimdilik basitleştirildi veya atlanabilir
+    // Backend olmadığı için binary veriyi localstorage'a koymak ağır olabilir
+    // Şimdilik media'yı boş geçiyoruz
 
     createPost.mutate(
       {
-        id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `post_${Date.now()}`,
         content: content.trim(),
-        media: mediaBlob,
-        scheduledTime: scheduledTimeNano,
-        status: PostStatus.pending,
-        createdAt: BigInt(Date.now() * 1_000_000),
-        updatedAt: BigInt(Date.now() * 1_000_000),
-        userId: identity.getPrincipal(),
+        scheduledTime: scheduledTimeMs,
+        status: 'pending',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        userId: 0, // Hook içinde doldurulacak
       },
       {
         onSuccess: () => {
@@ -79,28 +73,28 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Schedule New Post</DialogTitle>
+          <DialogTitle>Yeni Gönderi Planla</DialogTitle>
           <DialogDescription>
-            Specify the content and time you want to share on Farcaster.
+            Farcaster'da paylaşmak istediğin içeriği ve zamanı ayarla.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="content">Post Content</Label>
+            <Label htmlFor="content">İçerik</Label>
             <Textarea
               id="content"
-              placeholder="What would you like to share?"
+              placeholder="Ne düşünüyorsun?"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={6}
               required
               className="resize-none"
             />
-            <p className="text-xs text-muted-foreground">{content.length} characters</p>
+            <p className="text-xs text-muted-foreground">{content.length} karakter</p>
           </div>
 
           <div className="space-y-2">
-            <Label>Media (Optional)</Label>
+            <Label>Medya (İsteğe Bağlı)</Label>
             {mediaPreview ? (
               <div className="relative">
                 <img src={mediaPreview} alt="Preview" className="h-48 w-full rounded-lg object-cover" />
@@ -118,7 +112,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
               <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8">
                 <label htmlFor="media" className="cursor-pointer text-center">
                   <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                  <p className="mt-2 text-sm text-muted-foreground">Upload image or video</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Resim veya Video yükle</p>
                   <input
                     id="media"
                     type="file"
@@ -133,7 +127,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">Tarih</Label>
               <Input
                 id="date"
                 type="date"
@@ -144,7 +138,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="time">Time</Label>
+              <Label htmlFor="time">Saat</Label>
               <Input
                 id="time"
                 type="time"
@@ -157,11 +151,11 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              İptal
             </Button>
             <Button type="submit" disabled={createPost.isPending}>
               {createPost.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Schedule
+              Planla
             </Button>
           </div>
         </form>
