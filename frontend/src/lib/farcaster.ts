@@ -1,103 +1,70 @@
-/**
- * Farcaster Mini App integration utilities
- * Handles authentication, cast publishing, and API interactions
- */
+import sdk from '@farcaster/frame-sdk';
 
 export interface FarcasterUser {
   fid: number;
-  username: string;
-  displayName: string;
-  pfp?: string;
-  bio?: string;
-}
-
-export interface CastData {
-  text: string;
-  embeds?: string[];
-  parent?: string;
-}
-
-export interface ScheduledCastResponse {
-  success: boolean;
-  castHash?: string;
-  error?: string;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
 }
 
 /**
- * Get Farcaster user information from the current session
+ * Farcaster Context'ini başlatır ve kullanıcı bilgisini döner.
+ * Uygulama yüklendiğinde bu fonksiyon çağrılmalıdır.
  */
-export async function getFarcasterUser(): Promise<FarcasterUser | null> {
+export async function initFarcaster(): Promise<FarcasterUser | null> {
   try {
-    // In a real Farcaster Mini App, this would use the Farcaster SDK
-    // For now, this is a placeholder that would be replaced with actual SDK calls
-    const response = await fetch('/api/farcaster/user', {
-      credentials: 'include',
-    });
+    // SDK'nın context verisini yüklemesini bekle
+    const context = await sdk.context;
     
-    if (!response.ok) {
-      return null;
+    // Farcaster'a uygulamanın hazır olduğunu bildir (Splash screen'i kaldırır)
+    sdk.actions.ready();
+
+    // Eğer bir kullanıcı ile frame içinde açıldıysa bilgileri döndür
+    if (context && context.user) {
+      console.log("Farcaster User Found:", context.user);
+      return {
+        fid: context.user.fid,
+        username: context.user.username,
+        displayName: context.user.displayName,
+        pfpUrl: context.user.pfpUrl
+      };
     }
     
-    return await response.json();
+    return null;
   } catch (error) {
-    console.error('Failed to get Farcaster user:', error);
+    console.error('Farcaster SDK Init Error:', error);
     return null;
   }
 }
 
 /**
- * Publish a cast to Farcaster
+ * Uygulamanın Farcaster Frame içinde çalışıp çalışmadığını kontrol eder.
  */
-export async function publishCast(castData: CastData): Promise<ScheduledCastResponse> {
+export function isFarcasterContext(): boolean {
+  return !!sdk.context;
+}
+
+/**
+ * Kullanıcıyı paylaşım yapması için Warpcast composer'a yönlendirir.
+ * (Otomatik paylaşım için backend/signer gerekir, bu manuel tetikleme içindir)
+ */
+export function openComposer(text: string) {
   try {
-    const response = await fetch('/api/farcaster/cast', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(castData),
-    });
-    
-    const result = await response.json();
-    
-    if (!response.ok) {
-      return {
-        success: false,
-        error: result.error || 'Failed to publish cast',
-      };
-    }
-    
-    return {
-      success: true,
-      castHash: result.hash,
-    };
-  } catch (error) {
-    console.error('Failed to publish cast:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`);
+  } catch (e) {
+    console.error("Composer açılırken hata:", e);
+    // Fallback: Standart web linki
+    window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`, '_blank');
   }
 }
 
 /**
- * Verify if the app is running in a Farcaster Mini App context
+ * Kullanıcının profilini kapatır (Frame'i kapatır)
  */
-export function isFarcasterMiniApp(): boolean {
-  // Check if running in Farcaster Mini App context
-  // This would check for specific Farcaster SDK globals or URL parameters
-  return typeof window !== 'undefined' && 
-         (window.location.search.includes('farcaster=true') || 
-          'farcaster' in window);
-}
-
-/**
- * Get Farcaster Mini App configuration
- */
-export function getFarcasterConfig() {
-  return {
-    appId: import.meta.env.VITE_FARCASTER_APP_ID || 'autoshout',
-    apiEndpoint: import.meta.env.VITE_FARCASTER_API_ENDPOINT || 'https://api.warpcast.com/v2',
-  };
+export function closeFrame() {
+  try {
+    sdk.actions.close();
+  } catch (e) {
+    console.error("Frame kapatılamadı:", e);
+  }
 }
