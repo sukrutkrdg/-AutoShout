@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjI4NzI4NiwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDg0ODhiNkY5NThiMTVlQzQxZjZiNmMyRWY4MkFEQzEwNTc4NTU5NjkifQ",
+    "payload": "eyJkb21haW4iOiJhdXRvLXNob3V0LTV1NzUudmVyY2VsLmFwcCJ9",
+    "signature": "cDuT4JZJ291MGl33klWrIsuo9iqbpUvHoxOR+eS7sDwcMizxfYyPrQHaxAj/hYPFWsnCa4iBsOTP38OfpHcamxs="
+  },
+  "frame": {
+    "version": "1",
+    "name": "Example Frame",
+    "iconUrl": "https://auto-shout-5u75.vercel.app/icon.png",
+    "homeUrl": "https://auto-shout-5u75.vercel.app",
+    "imageUrl": "https://auto-shout-5u75.vercel.app/image.png",
+    "buttonTitle": "Check this out",
+    "splashImageUrl": "https://auto-shout-5u75.vercel.app/splash.png",
+    "splashBackgroundColor": "#eeccff",
+    "webhookUrl": "https://auto-shout-5u75.vercel.app/api/webhook"
+  }
+}
