@@ -2,13 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ScheduledPost, UserProfile } from '../lib/types';
 import { initFarcaster } from '../lib/farcaster';
+// DÜZELTME: Named import kullanıyoruz (süslü parantez içinde)
 import { supabase } from '../lib/supabase';
 
 // --- HELPER ---
 async function getCurrentFid(): Promise<number> {
     const user = await initFarcaster();
-    // Eğer dev modundaysak ve user yoksa (tarayıcı testi)
-    if (!user && import.meta.env.DEV) return 1; 
+    if (!user && import.meta.env.DEV) return 1; // Dev modu için sahte ID
     if (!user) throw new Error("User session not found");
     return user.fid;
 }
@@ -37,15 +37,16 @@ export function useSaveCallerUserProfile() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (profile: UserProfile & { fid: number }) => {
-      // Profil yoksa oluştur, varsa güncelle (Upsert)
+    mutationFn: async (profile: UserProfile) => {
+      const fid = await getCurrentFid();
+      
       const { error } = await supabase
         .from('profiles')
         .upsert({
-            fid: profile.fid, // Bunu dışarıdan alacağız veya hook içinde belirleyeceğiz
-            username: profile.farcasterHandle, // Tip uyumsuzluğu varsa düzeltilmeli
+            fid: fid,
+            username: profile.farcasterHandle,
             display_name: profile.name,
-            is_premium: profile.isPremium
+            is_premium: profile.isPremium,
         });
         
       if (error) throw error;
@@ -73,8 +74,6 @@ export function useGetUserScheduledPosts() {
 
         if (error) throw error;
         
-        // Veritabanından gelen snake_case'i camelCase'e çevirmemiz gerekebilir
-        // veya tipleri ona göre ayarlamalıyız. Şimdilik basit map:
         return (data || []).map((p: any) => ({
             ...p,
             scheduledTime: p.scheduled_time,
@@ -91,10 +90,8 @@ export function useCreateScheduledPost() {
     mutationFn: async (post: ScheduledPost) => {
       const fid = await getCurrentFid();
       
-      // Önce profilin var olduğundan emin olalım (Basit çözüm)
       const { data: profile } = await supabase.from('profiles').select('fid').eq('fid', fid).single();
       if (!profile) {
-          // Profil yoksa boş bir profil oluştur
           await supabase.from('profiles').insert({ fid, username: 'user' });
       }
 
@@ -132,15 +129,37 @@ export function useDeleteScheduledPost() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
+      queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
       toast.success('Cast deleted');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete cast: ' + error.message);
     },
   });
 }
 
-// ... Diğer count fonksiyonları da benzer şekilde güncellenebilir
+export function useGetWeeklyPostCount() {
+  return useQuery({
+    queryKey: ['weeklyPostCount'],
+    queryFn: async () => {
+        const fid = await getCurrentFid();
+        const { count, error } = await supabase
+            .from('posts')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_fid', fid);
+            
+        if (error) return BigInt(0);
+        return BigInt(count || 0);
+    },
+  });
+}
+
 export function useGetRemainingWeeklyPosts() {
-    return useQuery({
-        queryKey: ['remainingWeeklyPosts'],
-        queryFn: async () => BigInt(10) // Şimdilik sabit
-    })
+  return useQuery({
+    queryKey: ['remainingWeeklyPosts'],
+    queryFn: async () => {
+        return BigInt(100); 
+    },
+  });
 }

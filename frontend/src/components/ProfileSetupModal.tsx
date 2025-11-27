@@ -15,8 +15,8 @@ export default function ProfileSetupModal() {
     e.preventDefault();
     if (!name.trim() || !farcasterHandle.trim()) return;
 
+    // DÜZELTME: Buraya 'fid' yazmıyoruz, hook kendisi hallediyor.
     saveProfile.mutate({
-      fid: fid,
       name: name.trim(),
       farcasterHandle: farcasterHandle.trim().replace('@', ''),
       isPremium: false,
@@ -35,10 +35,10 @@ export default function ProfileSetupModal() {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Your Name</Label>
+            <Label htmlFor="name">Name</Label>
             <Input
               id="name"
-              placeholder="Enter your name"
+              placeholder="Your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -53,7 +53,7 @@ export default function ProfileSetupModal() {
               onChange={(e) => setFarcasterHandle(e.target.value)}
               required
             />
-            <p className="text-xs text-muted-foreground">Enter without the @ symbol</p>
+            <p className="text-xs text-muted-foreground">Enter without @ symbol</p>
           </div>
           <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
             {saveProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

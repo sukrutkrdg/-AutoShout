@@ -1,14 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Vite projelerinde env değişkenleri import.meta.env üzerinden okunur.
-// Değişkenlerin başında VITE_ olması şarttır.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Ortam değişkenlerini al (Vite uyumlu)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Hata ayıklama: Eğer değişkenler yoksa konsola uyarı bas (Geliştirme aşamasında hayat kurtarır)
+// Eğer boşsa hata bas (Debug için)
 if (!supabaseUrl || !supabaseKey) {
-  console.error("⚠️ Supabase URL veya Anon Key bulunamadı! .env dosyanızı kontrol edin.");
+  console.error("⚠️ Supabase URL veya Key eksik! .env dosyasını kontrol et.");
 }
 
-// Supabase istemcisini oluştur
+// Supabase istemcisini oluştur ve dışa aktar
 export const supabase = createClient(supabaseUrl, supabaseKey);
