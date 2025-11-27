@@ -25,7 +25,7 @@ export default function CalendarView({ posts }: CalendarViewProps) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('tr-TR', {
+    return date.toLocaleDateString('en-US', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -35,7 +35,7 @@ export default function CalendarView({ posts }: CalendarViewProps) {
 
   const formatTime = (timeMs: number) => {
     const date = new Date(timeMs);
-    return date.toLocaleTimeString('tr-TR', {
+    return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -48,9 +48,9 @@ export default function CalendarView({ posts }: CalendarViewProps) {
           <div className="mb-4 rounded-full bg-muted p-4">
             <Clock className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold">Planlanmış gönderi yok</h3>
+          <h3 className="mb-2 text-lg font-semibold">No scheduled casts</h3>
           <p className="text-center text-sm text-muted-foreground">
-            Takvimde görüntülenecek bekleyen gönderi bulunmuyor.
+            There are no pending casts to display on the calendar.
           </p>
         </CardContent>
       </Card>
@@ -68,7 +68,7 @@ export default function CalendarView({ posts }: CalendarViewProps) {
           <div key={dateKey}>
             <div className="mb-3 flex items-center gap-3">
               <h3 className="text-lg font-semibold capitalize">{formatDate(dateKey)}</h3>
-              <Badge variant="secondary">{datePosts.length} gönderi</Badge>
+              <Badge variant="secondary">{datePosts.length} {datePosts.length === 1 ? 'cast' : 'casts'}</Badge>
             </div>
             <div className="space-y-3">
               {datePosts.map((post) => (

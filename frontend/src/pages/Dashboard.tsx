@@ -19,7 +19,6 @@ export default function Dashboard({ user }: DashboardProps) {
   const { data: remainingPosts } = useGetRemainingWeeklyPosts();
   const [showScheduler, setShowScheduler] = useState(false);
 
-  // DÜZELTME: PostStatus.pending yerine direkt 'pending' kullanıyoruz
   const pendingPosts = posts.filter(p => p.status === 'pending');
   const publishedPosts = posts.filter(p => p.status === 'published');
   const failedPosts = posts.filter(p => p.status === 'failed');
@@ -33,11 +32,11 @@ export default function Dashboard({ user }: DashboardProps) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Planlanmış gönderilerini yönet</p>
+            <p className="text-muted-foreground">Manage your scheduled casts</p>
           </div>
           <Button onClick={() => setShowScheduler(true)} size="lg" className="gap-2">
             <Plus className="h-5 w-5" />
-            Yeni Gönderi Planla
+            Schedule New Cast
           </Button>
         </div>
       </div>
@@ -45,46 +44,46 @@ export default function Dashboard({ user }: DashboardProps) {
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bekleyen</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{pendingPosts.length}</div>
-            <p className="text-xs text-muted-foreground">Paylaşılmayı bekliyor</p>
+            <p className="text-xs text-muted-foreground">Waiting to be published</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Yayınlanan</CardTitle>
+            <CardTitle className="text-sm font-medium">Published</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{publishedPosts.length}</div>
-            <p className="text-xs text-muted-foreground">Başarıyla paylaşıldı</p>
+            <p className="text-xs text-muted-foreground">Successfully published</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hatalı</CardTitle>
+            <CardTitle className="text-sm font-medium">Failed</CardTitle>
             <XCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{failedPosts.length}</div>
-            <p className="text-xs text-muted-foreground">Paylaşılamadı</p>
+            <p className="text-xs text-muted-foreground">Could not be published</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Haftalık Kota</CardTitle>
+            <CardTitle className="text-sm font-medium">Weekly Quota</CardTitle>
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{usedPosts}/{weeklyLimit}</div>
             <p className="text-xs text-muted-foreground">
-              {userProfile?.isPremium ? 'Premium' : 'Ücretsiz'} plan
+              {userProfile?.isPremium ? 'Premium' : 'Free'} plan
             </p>
           </CardContent>
         </Card>
@@ -95,22 +94,22 @@ export default function Dashboard({ user }: DashboardProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-primary" />
-              Premium'a Geç
+              Upgrade to Premium
             </CardTitle>
             <div className="text-sm text-muted-foreground">
-              Haftada 100 gönderi planla, öncelikli destek al ve daha fazlasına eriş.
+              Schedule 100 casts per week, get priority support, and access more features.
             </div>
           </CardHeader>
           <CardContent>
-            <Button variant="default">Yükselt</Button>
+            <Button variant="default">Upgrade</Button>
           </CardContent>
         </Card>
       )}
 
       <Tabs defaultValue="list" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="list">Liste Görünümü</TabsTrigger>
-          <TabsTrigger value="calendar">Takvim Görünümü</TabsTrigger>
+          <TabsTrigger value="list">List View</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list" className="space-y-4">

@@ -23,7 +23,7 @@ export default function PostsList({ posts }: PostsListProps) {
 
   const formatDate = (timeMs: number) => {
     const date = new Date(timeMs);
-    return date.toLocaleString('tr-TR', {
+    return date.toLocaleString('en-US', {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
@@ -38,21 +38,21 @@ export default function PostsList({ posts }: PostsListProps) {
         return (
           <Badge variant="outline" className="gap-1">
             <Clock className="h-3 w-3" />
-            Bekliyor
+            Pending
           </Badge>
         );
       case 'published':
         return (
           <Badge variant="outline" className="gap-1 border-green-500/50 text-green-600 dark:text-green-400">
             <CheckCircle2 className="h-3 w-3" />
-            Yayınlandı
+            Published
           </Badge>
         );
       case 'failed':
         return (
           <Badge variant="destructive" className="gap-1">
             <XCircle className="h-3 w-3" />
-            Hatalı
+            Failed
           </Badge>
         );
     }
@@ -72,9 +72,9 @@ export default function PostsList({ posts }: PostsListProps) {
           <div className="mb-4 rounded-full bg-muted p-4">
             <Clock className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold">Henüz planlanmış gönderi yok</h3>
+          <h3 className="mb-2 text-lg font-semibold">No scheduled casts yet</h3>
           <p className="text-center text-sm text-muted-foreground">
-            İlk gönderini oluşturmak için "Yeni Gönderi Planla" butonuna tıkla.
+            Click "Schedule New Cast" button to create your first cast.
           </p>
         </CardContent>
       </Card>
@@ -111,7 +111,7 @@ export default function PostsList({ posts }: PostsListProps) {
               {post.media && (
                 <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                   <Image className="h-4 w-4" />
-                  <span>Medya eklendi</span>
+                  <span>Media attached</span>
                 </div>
               )}
             </CardContent>
@@ -122,15 +122,15 @@ export default function PostsList({ posts }: PostsListProps) {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Gönderiyi Sil</AlertDialogTitle>
+            <AlertDialogTitle>Delete Cast</AlertDialogTitle>
             <AlertDialogDescription>
-              Bu gönderiyi silmek istediğine emin misin? Bu işlem geri alınamaz.
+              Are you sure you want to delete this cast? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Sil
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

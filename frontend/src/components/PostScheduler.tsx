@@ -51,7 +51,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
         status: 'pending',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        userId: 0, // Hook içinde gerçek ID ile doldurulacak
+        userId: 0, 
       },
       {
         onSuccess: () => {
@@ -67,28 +67,28 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Yeni Gönderi Planla</DialogTitle>
+          <DialogTitle>Schedule New Cast</DialogTitle>
           <DialogDescription>
-            Farcaster'da paylaşmak istediğin içeriği ve zamanı ayarla.
+            Specify the content and time you want to share on Farcaster.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="content">İçerik</Label>
+            <Label htmlFor="content">Content</Label>
             <Textarea
               id="content"
-              placeholder="Ne düşünüyorsun?"
+              placeholder="What's on your mind?"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={6}
               required
               className="resize-none"
             />
-            <p className="text-xs text-muted-foreground">{content.length} karakter</p>
+            <p className="text-xs text-muted-foreground">{content.length} characters</p>
           </div>
 
           <div className="space-y-2">
-            <Label>Medya (İsteğe Bağlı)</Label>
+            <Label>Media (Optional)</Label>
             {mediaPreview ? (
               <div className="relative">
                 <img src={mediaPreview} alt="Preview" className="h-48 w-full rounded-lg object-cover" />
@@ -106,7 +106,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
               <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8">
                 <label htmlFor="media" className="cursor-pointer text-center">
                   <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                  <p className="mt-2 text-sm text-muted-foreground">Resim veya Video yükle</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Upload Image or Video</p>
                   <input
                     id="media"
                     type="file"
@@ -121,7 +121,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="date">Tarih</Label>
+              <Label htmlFor="date">Date</Label>
               <Input
                 id="date"
                 type="date"
@@ -132,7 +132,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="time">Saat</Label>
+              <Label htmlFor="time">Time</Label>
               <Input
                 id="time"
                 type="time"
@@ -145,11 +145,11 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              İptal
+              Cancel
             </Button>
             <Button type="submit" disabled={createPost.isPending}>
               {createPost.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Planla
+              Schedule
             </Button>
           </div>
         </form>

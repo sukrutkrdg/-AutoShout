@@ -3,8 +3,6 @@ import { toast } from 'sonner';
 import { ScheduledPost, UserProfile, PostStatus } from '../lib/types';
 import { initFarcaster } from '../lib/farcaster';
 
-// --- MOCK DATABASE (LocalStorage) ---
-// Bu kısım ileride Supabase veya kendi API'n ile değişecek.
 const DB_KEYS = {
   POSTS: 'autoshout_posts',
   PROFILE: 'autoshout_profile'
@@ -12,7 +10,6 @@ const DB_KEYS = {
 
 const mockDb = {
   getPosts: async (fid: number): Promise<ScheduledPost[]> => {
-    // Gerçek API çağrısı simülasyonu (gecikme)
     await new Promise(r => setTimeout(r, 500));
     const allPosts = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
     return allPosts.filter((p: any) => p.userId === fid);
@@ -34,7 +31,7 @@ const mockDb = {
 
   getProfile: async (fid: number): Promise<UserProfile | null> => {
     const profiles = JSON.parse(localStorage.getItem(DB_KEYS.PROFILE) || '{}');
-    return profiles[fid] || null; // Düzeltilen satır
+    return profiles[fid] || null;
   },
 
   saveProfile: async (fid: number, profile: UserProfile) => {
@@ -44,12 +41,9 @@ const mockDb = {
   }
 };
 
-// --- HOOKS ---
-
-// Mevcut Farcaster kullanıcısının FID'sini almak için yardımcı
 async function getCurrentFid(): Promise<number> {
     const user = await initFarcaster();
-    if (!user) throw new Error("Kullanıcı oturumu bulunamadı");
+    if (!user) throw new Error("User session not found");
     return user.fid;
 }
 
@@ -74,10 +68,10 @@ export function useSaveCallerUserProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-      toast.success('Profil kaydedildi');
+      toast.success('Profile saved successfully');
     },
     onError: (error: Error) => {
-      toast.error('Hata: ' + error.message);
+      toast.error('Error: ' + error.message);
     },
   });
 }
@@ -101,19 +95,18 @@ export function useCreateScheduledPost() {
 
   return useMutation({
     mutationFn: async (post: ScheduledPost) => {
-      // FID kontrolü
       const fid = await getCurrentFid();
-      post.userId = fid; // Postun sahibini garantiye al
+      post.userId = fid; 
       await mockDb.addPost(post);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
       queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
-      toast.success('Post başarıyla planlandı');
+      toast.success('Cast scheduled successfully');
     },
     onError: (error: Error) => {
-      toast.error('Hata: ' + error.message);
+      toast.error('Error: ' + error.message);
     },
   });
 }
@@ -129,10 +122,10 @@ export function useDeleteScheduledPost() {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
       queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
-      toast.success('Post silindi');
+      toast.success('Cast deleted');
     },
     onError: (error: Error) => {
-      toast.error('Silinirken hata oluştu: ' + error.message);
+      toast.error('Failed to delete cast: ' + error.message);
     },
   });
 }
@@ -143,7 +136,6 @@ export function useGetWeeklyPostCount() {
     queryFn: async () => {
         const fid = await getCurrentFid();
         const posts = await mockDb.getPosts(fid);
-        // Basit bir haftalık filtreleme mantığı (Şimdilik tümünü sayıyor)
         return BigInt(posts.length); 
     },
   });
@@ -155,7 +147,7 @@ export function useGetRemainingWeeklyPosts() {
     queryFn: async () => {
         const fid = await getCurrentFid();
         const posts = await mockDb.getPosts(fid);
-        return BigInt(10 - posts.length); // Örnek limit: 10
+        return BigInt(10 - posts.length); 
     },
   });
 }
