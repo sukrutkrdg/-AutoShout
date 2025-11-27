@@ -1,13 +1,26 @@
 {
   "name": "AutoShout",
-  // ...
+  "short_name": "AutoShout",
+  "description": "AutoShout ile Farcaster gönderilerini planla.",
+  "version": "1.0.0",
+  "icons": [
+    {
+      "src": "/icon.png", 
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8b5cf6",
   "frame": {
     "version": "1",
     "name": "AutoShout",
-    "homeUrl": "https://senin-uygulaman.com",
-    "iconUrl": "https://senin-uygulaman.com/icon.png",
-    "splashImageUrl": "https://senin-uygulaman.com/splash.png",
+    "homeUrl": "https://autoshout-demo.vercel.app",
+    "iconUrl": "https://autoshout-demo.vercel.app/icon.png",
+    "splashImageUrl": "https://autoshout-demo.vercel.app/splash.png",
     "splashBackgroundColor": "#8b5cf6",
-    "webhookUrl": "https://senin-uygulaman.com/api/webhook"
+    "webhookUrl": "https://autoshout-demo.vercel.app/api/webhook"
   }
 }
