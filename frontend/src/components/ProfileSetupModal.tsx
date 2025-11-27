@@ -6,7 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 
-export default function ProfileSetupModal() {
+interface ProfileSetupModalProps {
+  fid: number; // signer’dan gelen Farcaster ID
+  open: boolean;
+}
+
+export default function ProfileSetupModal({ fid, open }: ProfileSetupModalProps) {
   const [name, setName] = useState('');
   const [farcasterHandle, setFarcasterHandle] = useState('');
   const saveProfile = useSaveCallerUserProfile();
@@ -16,7 +21,7 @@ export default function ProfileSetupModal() {
     if (!name.trim() || !farcasterHandle.trim()) return;
 
     saveProfile.mutate({
-      fid: fid,
+      fid: fid, // artık tanımlı ✔
       name: name.trim(),
       farcasterHandle: farcasterHandle.trim().replace('@', ''),
       isPremium: false,
@@ -25,7 +30,7 @@ export default function ProfileSetupModal() {
   };
 
   return (
-    <Dialog open={true}>
+    <Dialog open={open}>
       <DialogContent className="sm:max-w-md" onPointerDownOutside={(e: any) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Welcome! 👋</DialogTitle>
