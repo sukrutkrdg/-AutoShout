@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { createClient } from '@supabase/supabase-js';
 import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 
@@ -13,9 +15,6 @@ const config = new Configuration({
 const neynarClient = new NeynarAPIClient(config);
 
 export default async function handler(request: Request) {
-  // Sadece yetkili tetiklemelere izin ver (Vercel Cron koruması)
-  // Şimdilik test için burayı açık bırakıyoruz.
-
   try {
     console.log("⏳ Zamanlanmış postlar kontrol ediliyor...");
 
@@ -25,7 +24,7 @@ export default async function handler(request: Request) {
       .from('posts')
       .select('*')
       .eq('status', 'pending')
-      .lte('scheduled_time', now); // scheduled_time <= şu an
+      .lte('scheduled_time', now); 
 
     if (error) throw error;
 
@@ -42,16 +41,17 @@ export default async function handler(request: Request) {
     const results = [];
     for (const post of posts) {
       try {
-        // Şimdilik herkes için .env'deki "Geliştirici Signer"ını kullanıyoruz.
-        // İleride buraya post.user_fid'ye göre kullanıcının kendi signer'ını çekme mantığı eklenecek.
         const signerUuid = process.env.NEYNAR_SIGNER_UUID!;
 
         // Neynar ile paylaş
-        const cast = await neynarClient.publishCast({
+        // DÜZELTME: Yanıtı 'any' olarak alıyoruz ki TypeScript 'hash yok' diye kızmasın
+        const castResponse: any = await neynarClient.publishCast({
           signerUuid: signerUuid,
           text: post.content,
-          // Eğer medya varsa embeds: [{ url: post.media_url }] eklenebilir
         });
+        
+        // Neynar v2'de hash bazen cast.hash, bazen direkt hash olarak gelebilir, ikisini de deniyoruz
+        const castHash = castResponse.hash || castResponse.cast?.hash;
 
         // 4. Başarılıysa veritabanını güncelle ('published')
         await supabase
@@ -59,15 +59,14 @@ export default async function handler(request: Request) {
           .update({ status: 'published' })
           .eq('id', post.id);
 
-        results.push({ id: post.id, status: 'success', hash: cast.hash });
+        results.push({ id: post.id, status: 'success', hash: castHash });
 
       } catch (err: any) {
         console.error(`❌ Post ${post.id} hatası:`, err);
         
-        // Hata varsa veritabanını güncelle ('failed')
         await supabase
           .from('posts')
-          .update({ status: 'failed' }) // Hata mesajını da kaydedebilirsin
+          .update({ status: 'failed' }) 
           .eq('id', post.id);
           
         results.push({ id: post.id, status: 'failed', error: err.message });
