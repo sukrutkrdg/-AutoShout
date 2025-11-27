@@ -32,8 +32,7 @@ export function useGetCallerUserProfile() {
         return null;
       }
 
-      // 🔥 KRİTİK DÜZELTME BURADA 🔥
-      // Veritabanından gelen veriyi (snake_case), uygulamanın beklediği tipe (camelCase) çeviriyoruz.
+      // 🔥 DÜZELTME BURADA: Veritabanı (snake_case) -> Uygulama (camelCase) Eşleşmesi
       if (data) {
         return {
             name: data.display_name,       // DB: display_name -> App: name
@@ -56,7 +55,7 @@ export function useSaveCallerUserProfile() {
     mutationFn: async (profile: UserProfile) => {
       const fid = await getCurrentFid();
       
-      // Veritabanına yazarken de tam tersini yapıyoruz
+      // Yazarken de tam tersi eşleştirme yapıyoruz
       const { error } = await supabase
         .from('profiles')
         .upsert({
@@ -91,14 +90,15 @@ export function useGetUserScheduledPosts() {
 
         if (error) throw error;
         
-        // Postlar için de eşleştirme yapıyoruz
         return (data || []).map((p: any) => ({
             id: p.id,
             content: p.content,
-            scheduledTime: Number(p.scheduled_time), // BigInt çökmesini engellemek için Number
+            // Medya varsa url objesi oluştur, yoksa undefined
+            media: p.media_url ? { url: p.media_url } : undefined,
+            scheduledTime: Number(p.scheduled_time), 
             status: p.status,
             createdAt: new Date(p.created_at).getTime(),
-            updatedAt: Date.now(), // DB'de update sütunu yoksa şimdiki zamanı ver
+            updatedAt: Date.now(),
             userId: Number(p.user_fid)
         })) as ScheduledPost[];
     },
@@ -112,7 +112,7 @@ export function useCreateScheduledPost() {
     mutationFn: async (post: ScheduledPost) => {
       const fid = await getCurrentFid();
       
-      // Profil kontrolü: Eğer profil yoksa oluştur (Yabancı anahtar hatasını önler)
+      // Profil kontrolü
       const { data: profile } = await supabase.from('profiles').select('fid').eq('fid', fid).single();
       if (!profile) {
           await supabase.from('profiles').insert({ fid, username: 'user', display_name: 'User' });
@@ -132,6 +132,7 @@ export function useCreateScheduledPost() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
+      queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
       toast.success('Cast scheduled successfully');
     },
     onError: (error: Error) => {
@@ -177,7 +178,7 @@ export function useGetRemainingWeeklyPosts() {
   return useQuery({
     queryKey: ['remainingWeeklyPosts'],
     queryFn: async () => {
-        return 100;
+        return 100; 
     },
   });
 }
