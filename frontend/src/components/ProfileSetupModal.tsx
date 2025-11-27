@@ -16,6 +16,7 @@ export default function ProfileSetupModal() {
     if (!name.trim() || !farcasterHandle.trim()) return;
 
     saveProfile.mutate({
+      fid: fid,
       name: name.trim(),
       farcasterHandle: farcasterHandle.trim().replace('@', ''),
       isPremium: false,
