@@ -14,11 +14,15 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting - GEVŞETİLDİ */
+    /* Linting (Hataları gevşetmiştik, aynen koruyoruz) */
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
+
+    /* --- ÇÖZÜM BURADA --- */
+    /* Vite tiplerini açıkça ekliyoruz */
+    "types": ["vite/client"],
 
     /* Paths */
     "baseUrl": ".",
