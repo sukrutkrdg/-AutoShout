@@ -4,10 +4,10 @@ import { ScheduledPost, UserProfile } from '../lib/types';
 import { initFarcaster } from '../lib/farcaster';
 import { supabase } from '../lib/supabase';
 
-// --- HELPER ---
+// --- YARDIMCI FONKSİYON ---
 async function getCurrentFid(): Promise<number> {
     const user = await initFarcaster();
-    // Dev modunda test için
+    // Dev modunda tarayıcıda test ederken hata almamak için sahte ID
     if (!user && import.meta.env.DEV) return 1; 
     if (!user) throw new Error("User session not found");
     return user.fid;
@@ -27,18 +27,18 @@ export function useGetCallerUserProfile() {
         .single();
       
       if (error) {
-        // Profil bulunamazsa null dön, hata patlatma
-        if (error.code === 'PGRST116') return null;
+        if (error.code === 'PGRST116') return null; // Kayıt yoksa null dön
         console.error(error);
         return null;
       }
 
-      // DÜZELTME BURADA: Veritabanından gelen 'display_name'i 'name'e çeviriyoruz
+      // 🔥 KRİTİK DÜZELTME BURADA 🔥
+      // Veritabanından gelen veriyi (snake_case), uygulamanın beklediği tipe (camelCase) çeviriyoruz.
       if (data) {
         return {
-            name: data.display_name, // display_name -> name
-            farcasterHandle: data.username, // username -> farcasterHandle
-            isPremium: data.is_premium, // is_premium -> isPremium
+            name: data.display_name,       // DB: display_name -> App: name
+            farcasterHandle: data.username,// DB: username -> App: farcasterHandle
+            isPremium: data.is_premium,    // DB: is_premium -> App: isPremium
             createdAt: new Date(data.created_at).getTime()
         } as UserProfile;
       }
@@ -55,14 +55,17 @@ export function useSaveCallerUserProfile() {
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
       const fid = await getCurrentFid();
+      
+      // Veritabanına yazarken de tam tersini yapıyoruz
       const { error } = await supabase
         .from('profiles')
         .upsert({
             fid: fid,
-            username: profile.farcasterHandle,
-            display_name: profile.name, // Frontend'den gelen name'i display_name'e yaz
+            username: profile.farcasterHandle, // App -> DB
+            display_name: profile.name,        // App -> DB
             is_premium: profile.isPremium,
         });
+        
       if (error) throw error;
     },
     onSuccess: () => {
@@ -88,15 +91,14 @@ export function useGetUserScheduledPosts() {
 
         if (error) throw error;
         
-        // Post verilerini de eşleştiriyoruz
+        // Postlar için de eşleştirme yapıyoruz
         return (data || []).map((p: any) => ({
             id: p.id,
             content: p.content,
-            media: p.media_url ? { url: p.media_url } : undefined,
-            scheduledTime: Number(p.scheduled_time), // BigInt -> Number
+            scheduledTime: Number(p.scheduled_time), // BigInt çökmesini engellemek için Number
             status: p.status,
             createdAt: new Date(p.created_at).getTime(),
-            updatedAt: Date.now(),
+            updatedAt: Date.now(), // DB'de update sütunu yoksa şimdiki zamanı ver
             userId: Number(p.user_fid)
         })) as ScheduledPost[];
     },
@@ -110,10 +112,9 @@ export function useCreateScheduledPost() {
     mutationFn: async (post: ScheduledPost) => {
       const fid = await getCurrentFid();
       
-      // Profil kontrolü (Yoksa oluştur)
+      // Profil kontrolü: Eğer profil yoksa oluştur (Yabancı anahtar hatasını önler)
       const { data: profile } = await supabase.from('profiles').select('fid').eq('fid', fid).single();
       if (!profile) {
-          // Farcaster context'ten gelen ismi kullanabiliriz ama şimdilik basit tutuyoruz
           await supabase.from('profiles').insert({ fid, username: 'user', display_name: 'User' });
       }
 
@@ -157,7 +158,6 @@ export function useDeleteScheduledPost() {
   });
 }
 
-// Not: BigInt sorunu yaşamamak için sayıları Number'a çevirerek dönüyoruz
 export function useGetWeeklyPostCount() {
   return useQuery({
     queryKey: ['weeklyPostCount'],
@@ -167,7 +167,7 @@ export function useGetWeeklyPostCount() {
             .from('posts')
             .select('*', { count: 'exact', head: true })
             .eq('user_fid', fid);
-        if (error) return 0; // BigInt yerine number
+        if (error) return 0;
         return count || 0;
     },
   });
@@ -177,7 +177,7 @@ export function useGetRemainingWeeklyPosts() {
   return useQuery({
     queryKey: ['remainingWeeklyPosts'],
     queryFn: async () => {
-        return 100; // BigInt yerine number
+        return 100;
     },
   });
 }
