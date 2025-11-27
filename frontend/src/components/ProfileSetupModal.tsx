@@ -6,12 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 
-interface ProfileSetupModalProps {
-  fid: number; // signer’dan gelen Farcaster ID
-  open: boolean;
-}
-
-export default function ProfileSetupModal({ fid, open }: ProfileSetupModalProps) {
+export default function ProfileSetupModal() {
   const [name, setName] = useState('');
   const [farcasterHandle, setFarcasterHandle] = useState('');
   const saveProfile = useSaveCallerUserProfile();
@@ -20,8 +15,8 @@ export default function ProfileSetupModal({ fid, open }: ProfileSetupModalProps)
     e.preventDefault();
     if (!name.trim() || !farcasterHandle.trim()) return;
 
+    // DÜZELTME: 'fid' parametresi kaldırıldı, hook kendisi hallediyor.
     saveProfile.mutate({
-      fid: fid, // artık tanımlı ✔
       name: name.trim(),
       farcasterHandle: farcasterHandle.trim().replace('@', ''),
       isPremium: false,
@@ -30,7 +25,8 @@ export default function ProfileSetupModal({ fid, open }: ProfileSetupModalProps)
   };
 
   return (
-    <Dialog open={open}>
+    <Dialog open={true}>
+      {/* DÜZELTME: 'any' tipi eklendi */}
       <DialogContent className="sm:max-w-md" onPointerDownOutside={(e: any) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Welcome! 👋</DialogTitle>
@@ -40,7 +36,7 @@ export default function ProfileSetupModal({ fid, open }: ProfileSetupModalProps)
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Your Name</Label>
+            <Label htmlFor="name">Name</Label>
             <Input
               id="name"
               placeholder="Enter your name"
