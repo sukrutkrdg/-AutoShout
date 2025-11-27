@@ -4,6 +4,7 @@ import { ScheduledPost, UserProfile } from '../lib/types';
 import { initFarcaster } from '../lib/farcaster';
 import { supabase } from '../lib/supabase';
 
+// --- HELPER ---
 async function getCurrentFid(): Promise<number> {
     const user = await initFarcaster();
     // Dev modunda test için
@@ -11,6 +12,8 @@ async function getCurrentFid(): Promise<number> {
     if (!user) throw new Error("User session not found");
     return user.fid;
 }
+
+// --- HOOKS ---
 
 export function useGetCallerUserProfile() {
   return useQuery({
@@ -23,8 +26,24 @@ export function useGetCallerUserProfile() {
         .eq('fid', fid)
         .single();
       
-      if (error && error.code !== 'PGRST116') console.error(error);
-      return data as UserProfile | null;
+      if (error) {
+        // Profil bulunamazsa null dön, hata patlatma
+        if (error.code === 'PGRST116') return null;
+        console.error(error);
+        return null;
+      }
+
+      // DÜZELTME BURADA: Veritabanından gelen 'display_name'i 'name'e çeviriyoruz
+      if (data) {
+        return {
+            name: data.display_name, // display_name -> name
+            farcasterHandle: data.username, // username -> farcasterHandle
+            isPremium: data.is_premium, // is_premium -> isPremium
+            createdAt: new Date(data.created_at).getTime()
+        } as UserProfile;
+      }
+      
+      return null;
     },
     retry: false,
   });
@@ -34,7 +53,6 @@ export function useSaveCallerUserProfile() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    // DÜZELTME: Sadece profil verisi alıyoruz
     mutationFn: async (profile: UserProfile) => {
       const fid = await getCurrentFid();
       const { error } = await supabase
@@ -42,7 +60,7 @@ export function useSaveCallerUserProfile() {
         .upsert({
             fid: fid,
             username: profile.farcasterHandle,
-            display_name: profile.name,
+            display_name: profile.name, // Frontend'den gelen name'i display_name'e yaz
             is_premium: profile.isPremium,
         });
       if (error) throw error;
@@ -70,10 +88,16 @@ export function useGetUserScheduledPosts() {
 
         if (error) throw error;
         
+        // Post verilerini de eşleştiriyoruz
         return (data || []).map((p: any) => ({
-            ...p,
-            scheduledTime: p.scheduled_time,
-            userId: p.user_fid
+            id: p.id,
+            content: p.content,
+            media: p.media_url ? { url: p.media_url } : undefined,
+            scheduledTime: Number(p.scheduled_time), // BigInt -> Number
+            status: p.status,
+            createdAt: new Date(p.created_at).getTime(),
+            updatedAt: Date.now(),
+            userId: Number(p.user_fid)
         })) as ScheduledPost[];
     },
   });
@@ -86,9 +110,11 @@ export function useCreateScheduledPost() {
     mutationFn: async (post: ScheduledPost) => {
       const fid = await getCurrentFid();
       
+      // Profil kontrolü (Yoksa oluştur)
       const { data: profile } = await supabase.from('profiles').select('fid').eq('fid', fid).single();
       if (!profile) {
-          await supabase.from('profiles').insert({ fid, username: 'user' });
+          // Farcaster context'ten gelen ismi kullanabiliriz ama şimdilik basit tutuyoruz
+          await supabase.from('profiles').insert({ fid, username: 'user', display_name: 'User' });
       }
 
       const { error } = await supabase
@@ -105,7 +131,6 @@ export function useCreateScheduledPost() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
-      queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
       toast.success('Cast scheduled successfully');
     },
     onError: (error: Error) => {
@@ -124,16 +149,15 @@ export function useDeleteScheduledPost() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userScheduledPosts'] });
-      queryClient.invalidateQueries({ queryKey: ['weeklyPostCount'] });
-      queryClient.invalidateQueries({ queryKey: ['remainingWeeklyPosts'] });
       toast.success('Cast deleted');
     },
     onError: (error: Error) => {
-      toast.error('Failed to delete cast: ' + error.message);
+      toast.error('Failed to delete: ' + error.message);
     },
   });
 }
 
+// Not: BigInt sorunu yaşamamak için sayıları Number'a çevirerek dönüyoruz
 export function useGetWeeklyPostCount() {
   return useQuery({
     queryKey: ['weeklyPostCount'],
@@ -143,8 +167,8 @@ export function useGetWeeklyPostCount() {
             .from('posts')
             .select('*', { count: 'exact', head: true })
             .eq('user_fid', fid);
-        if (error) return BigInt(0);
-        return BigInt(count || 0);
+        if (error) return 0; // BigInt yerine number
+        return count || 0;
     },
   });
 }
@@ -153,7 +177,7 @@ export function useGetRemainingWeeklyPosts() {
   return useQuery({
     queryKey: ['remainingWeeklyPosts'],
     queryFn: async () => {
-        return BigInt(100); 
+        return 100; // BigInt yerine number
     },
   });
 }
