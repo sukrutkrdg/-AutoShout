@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Clock, CheckCircle2, XCircle, Trash2, Image } from 'lucide-react';
-import type { ScheduledPost } from '../backend';
-import { PostStatus } from '../backend';
+import type { ScheduledPost, PostStatus } from '../lib/types';
 
 interface PostsListProps {
   posts: ScheduledPost[];
@@ -22,10 +21,9 @@ export default function PostsList({ posts }: PostsListProps) {
     return bTime - aTime;
   });
 
-  const formatDate = (nanoTime: bigint) => {
-    const ms = Number(nanoTime) / 1_000_000;
-    const date = new Date(ms);
-    return date.toLocaleString('en-US', {
+  const formatDate = (timeMs: number) => {
+    const date = new Date(timeMs);
+    return date.toLocaleString('tr-TR', {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
@@ -36,25 +34,25 @@ export default function PostsList({ posts }: PostsListProps) {
 
   const getStatusBadge = (status: PostStatus) => {
     switch (status) {
-      case PostStatus.pending:
+      case 'pending':
         return (
           <Badge variant="outline" className="gap-1">
             <Clock className="h-3 w-3" />
-            Pending
+            Bekliyor
           </Badge>
         );
-      case PostStatus.published:
+      case 'published':
         return (
           <Badge variant="outline" className="gap-1 border-green-500/50 text-green-600 dark:text-green-400">
             <CheckCircle2 className="h-3 w-3" />
-            Published
+            Yayınlandı
           </Badge>
         );
-      case PostStatus.failed:
+      case 'failed':
         return (
           <Badge variant="destructive" className="gap-1">
             <XCircle className="h-3 w-3" />
-            Failed
+            Hatalı
           </Badge>
         );
     }
@@ -74,9 +72,9 @@ export default function PostsList({ posts }: PostsListProps) {
           <div className="mb-4 rounded-full bg-muted p-4">
             <Clock className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold">No scheduled posts yet</h3>
+          <h3 className="mb-2 text-lg font-semibold">Henüz planlanmış gönderi yok</h3>
           <p className="text-center text-sm text-muted-foreground">
-            Click "Schedule New Post" button to create your first post.
+            İlk gönderini oluşturmak için "Yeni Gönderi Planla" butonuna tıkla.
           </p>
         </CardContent>
       </Card>
@@ -97,7 +95,7 @@ export default function PostsList({ posts }: PostsListProps) {
                   </span>
                 </div>
               </div>
-              {post.status === PostStatus.pending && (
+              {post.status === 'pending' && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -113,7 +111,7 @@ export default function PostsList({ posts }: PostsListProps) {
               {post.media && (
                 <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                   <Image className="h-4 w-4" />
-                  <span>Media attached</span>
+                  <span>Medya eklendi</span>
                 </div>
               )}
             </CardContent>
@@ -124,15 +122,15 @@ export default function PostsList({ posts }: PostsListProps) {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Post</AlertDialogTitle>
+            <AlertDialogTitle>Gönderiyi Sil</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this post? This action cannot be undone.
+              Bu gönderiyi silmek istediğine emin misin? Bu işlem geri alınamaz.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              Sil
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

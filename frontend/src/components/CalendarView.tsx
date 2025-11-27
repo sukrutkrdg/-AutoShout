@@ -1,19 +1,17 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock } from 'lucide-react';
-import type { ScheduledPost } from '../backend';
-import { PostStatus } from '../backend';
+import type { ScheduledPost } from '../lib/types';
 
 interface CalendarViewProps {
   posts: ScheduledPost[];
 }
 
 export default function CalendarView({ posts }: CalendarViewProps) {
-  const pendingPosts = posts.filter(p => p.status === PostStatus.pending);
+  const pendingPosts = posts.filter(p => p.status === 'pending');
 
   const groupedByDate = pendingPosts.reduce((acc, post) => {
-    const ms = Number(post.scheduledTime) / 1_000_000;
-    const date = new Date(ms);
+    const date = new Date(post.scheduledTime);
     const dateKey = date.toISOString().split('T')[0];
     
     if (!acc[dateKey]) {
@@ -27,7 +25,7 @@ export default function CalendarView({ posts }: CalendarViewProps) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('tr-TR', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -35,10 +33,9 @@ export default function CalendarView({ posts }: CalendarViewProps) {
     });
   };
 
-  const formatTime = (nanoTime: bigint) => {
-    const ms = Number(nanoTime) / 1_000_000;
-    const date = new Date(ms);
-    return date.toLocaleTimeString('en-US', {
+  const formatTime = (timeMs: number) => {
+    const date = new Date(timeMs);
+    return date.toLocaleTimeString('tr-TR', {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -51,9 +48,9 @@ export default function CalendarView({ posts }: CalendarViewProps) {
           <div className="mb-4 rounded-full bg-muted p-4">
             <Clock className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold">No scheduled posts</h3>
+          <h3 className="mb-2 text-lg font-semibold">Planlanmış gönderi yok</h3>
           <p className="text-center text-sm text-muted-foreground">
-            There are no pending posts to display on the calendar.
+            Takvimde görüntülenecek bekleyen gönderi bulunmuyor.
           </p>
         </CardContent>
       </Card>
@@ -64,14 +61,14 @@ export default function CalendarView({ posts }: CalendarViewProps) {
     <div className="space-y-6">
       {sortedDates.map((dateKey) => {
         const datePosts = groupedByDate[dateKey].sort((a, b) => {
-          return Number(a.scheduledTime) - Number(b.scheduledTime);
+          return a.scheduledTime - b.scheduledTime;
         });
 
         return (
           <div key={dateKey}>
             <div className="mb-3 flex items-center gap-3">
               <h3 className="text-lg font-semibold capitalize">{formatDate(dateKey)}</h3>
-              <Badge variant="secondary">{datePosts.length} {datePosts.length === 1 ? 'post' : 'posts'}</Badge>
+              <Badge variant="secondary">{datePosts.length} gönderi</Badge>
             </div>
             <div className="space-y-3">
               {datePosts.map((post) => (

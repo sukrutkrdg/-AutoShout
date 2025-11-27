@@ -12,7 +12,6 @@ interface PostSchedulerProps {
 }
 
 export default function PostScheduler({ onClose }: PostSchedulerProps) {
-  // Identity hook'unu kaldırdık
   const createPost = useCreateScheduledPost();
   const [content, setContent] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -42,12 +41,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
     if (!content.trim() || !scheduledDate || !scheduledTime) return;
 
     const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
-    // Basit timestamp kullanıyoruz artık, BigInt nano saniye yerine ms
     const scheduledTimeMs = dateTime.getTime();
-
-    // Media blob işlemi şimdilik basitleştirildi veya atlanabilir
-    // Backend olmadığı için binary veriyi localstorage'a koymak ağır olabilir
-    // Şimdilik media'yı boş geçiyoruz
 
     createPost.mutate(
       {
@@ -57,7 +51,7 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
         status: 'pending',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        userId: 0, // Hook içinde doldurulacak
+        userId: 0, // Hook içinde gerçek ID ile doldurulacak
       },
       {
         onSuccess: () => {

@@ -34,7 +34,7 @@ const mockDb = {
 
   getProfile: async (fid: number): Promise<UserProfile | null> => {
     const profiles = JSON.parse(localStorage.getItem(DB_KEYS.PROFILE) || '{}');
-    returnWZ profiles[fid] || null;
+    return profiles[fid] || null; // Düzeltilen satır
   },
 
   saveProfile: async (fid: number, profile: UserProfile) => {
