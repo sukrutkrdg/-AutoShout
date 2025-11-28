@@ -7,7 +7,7 @@ const DropdownMenu = ({ children }: any) => {
 }
 
 const DropdownMenuTrigger = ({ asChild, children, ...props }: any) => {
-  return children // Trigger logic handled by parent for simplicity
+  return children 
 }
 
 const DropdownMenuContent = ({ align, className, children, ...props }: any) => (
@@ -16,8 +16,19 @@ const DropdownMenuContent = ({ align, className, children, ...props }: any) => (
   </div>
 )
 
-const DropdownMenuItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)} {...props} />
+// TypeScript Hatası Çözümü: disabled prop'unu buraya ekledik
+interface DropdownMenuItemProps extends React.HTMLAttributes<HTMLDivElement> {
+  disabled?: boolean;
+}
+
+const DropdownMenuItem = React.forwardRef<HTMLDivElement, DropdownMenuItemProps>(({ className, disabled, ...props }, ref) => (
+  <div 
+    ref={ref} 
+    // data-disabled attribute'u ekleyerek CSS'teki stilin çalışmasını sağlıyoruz
+    data-disabled={disabled ? "" : undefined}
+    className={cn("relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)} 
+    {...props} 
+  />
 ))
 DropdownMenuItem.displayName = "DropdownMenuItem"
 
