@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle, Bug } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -20,6 +20,9 @@ export default function ProfileSetupModal() {
   const [isApproved, setIsApproved] = useState(false);
   const [isLoadingSigner, setIsLoadingSigner] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  
+  // Hata Ayıklama için
+  const [debugData, setDebugData] = useState<any>(null);
 
   const saveProfile = useSaveCallerUserProfile();
 
@@ -54,33 +57,36 @@ export default function ProfileSetupModal() {
   // 1. Signer Oluşturma
   const createSigner = async () => {
     setIsLoadingSigner(true);
+    setDebugData(null); // Önceki hataları temizle
     try {
       const res = await fetch('/api/signer', { method: 'POST' });
       const data = await res.json();
       
-      console.log("🔥 API Yanıtı:", data); // Konsola yanıtı yazdıralım
+      console.log("🔥 API Yanıtı:", data); 
+      setDebugData(data); // Veriyi ekrana basmak için sakla
 
       if (data.signer_uuid) {
           setSignerUuid(data.signer_uuid);
           
-          // DÜZELTME: API'den gelen farklı URL isimlerini kontrol et
-          const url = data.signer_approval_url || data.link || data.url;
+          // DÜZELTME: Olası tüm URL alanlarını kontrol et
+          const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
           
           if (url) {
             setApprovalUrl(url);
             setIsPolling(true);
             pollSignerStatus(data.signer_uuid);
           } else {
-            console.error("Link bulunamadı:", data);
-            toast.error("Signer oluştu ancak link alınamadı.");
+            console.error("Link bulunamadı. Gelen veri:", data);
+            toast.error("Signer oluştu ancak onay linki bulunamadı. Aşağıdaki hata detayına bakın.");
           }
       } else {
-          toast.error("Signer UUID alınamadı.");
+          toast.error("Signer UUID alınamadı. API yanıtını kontrol edin.");
       }
 
     } catch (e) {
       console.error("Failed to create signer:", e);
-      toast.error("Signer oluşturulamadı.");
+      toast.error("Signer oluşturulamadı. Sunucu hatası olabilir.");
+      setDebugData({ error: e instanceof Error ? e.message : 'Bilinmeyen Hata' });
     } finally {
       setIsLoadingSigner(false);
     }
@@ -116,20 +122,19 @@ export default function ProfileSetupModal() {
       setApprovalUrl(null);
       setIsApproved(false);
       setIsPolling(false);
+      setDebugData(null);
   };
 
   // 3. Linki Açma Fonksiyonu
   const openApprovalLink = () => {
     if (!approvalUrl) {
-      toast.error("Onay linki henüz yüklenmedi.");
+      toast.error("Onay linki yüklenemedi. Lütfen API yanıtını kontrol edin.");
       return;
     }
 
     try {
-      // Önce Farcaster SDK ile açmayı dene
       sdk.actions.openUrl(approvalUrl);
     } catch (e) {
-      // Olmazsa standart pencere aç
       window.open(approvalUrl, '_blank');
     }
   };
@@ -156,7 +161,7 @@ export default function ProfileSetupModal() {
 
   return (
     <Dialog open={true}>
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e: any) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e: any) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Hoşgeldin! 👋</DialogTitle>
           <DialogDescription>
@@ -174,6 +179,14 @@ export default function ProfileSetupModal() {
               {isLoadingSigner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
               Farcaster Hesabını Bağla
             </Button>
+            
+            {/* Hata varsa göster */}
+            {debugData && !debugData.signer_uuid && (
+                <div className="w-full rounded-md bg-destructive/10 p-2 text-xs text-destructive overflow-auto">
+                    <p className="font-bold flex items-center gap-1"><Bug className="h-3 w-3"/> API Hatası:</p>
+                    <pre className="mt-1">{JSON.stringify(debugData, null, 2)}</pre>
+                </div>
+            )}
           </div>
         ) : !isApproved ? (
            // --- ADIM 2: ONAY BEKLE ---
@@ -183,32 +196,46 @@ export default function ProfileSetupModal() {
                 <span className="text-sm font-medium">Onay Bekleniyor</span>
              </div>
              
-             <p className="text-center text-xs text-muted-foreground px-4">
-               Aşağıdaki butona tıklayınca Warpcast açılacak. Lütfen açılan ekranda <strong>"Approve"</strong> butonuna basın.
-             </p>
-             
-             <div className="w-full space-y-3">
-                {/* ONAY LİNKİNİ AÇAN BUTON */}
-                <Button 
-                    type="button"
-                    className="w-full py-6 text-base"
-                    onClick={openApprovalLink}
-                >
-                    <ExternalLink className="mr-2 h-5 w-5" />
-                    Warpcast'i Aç ve Onayla
-                </Button>
-                
-                {!isPolling && (
-                    <div className="flex items-center justify-center gap-2 text-destructive text-xs">
-                        <AlertCircle className="h-3 w-3" /> 
-                        <span>Süre doldu. Lütfen "İptal Et" diyip tekrar deneyin.</span>
+             {/* URL VARSA BUTONU GÖSTER, YOKSA HATA GÖSTER */}
+             {approvalUrl ? (
+                 <>
+                    <p className="text-center text-xs text-muted-foreground px-4">
+                    Aşağıdaki butona tıklayınca Warpcast açılacak. Lütfen açılan ekranda <strong>"Approve"</strong> butonuna basın.
+                    </p>
+                    <div className="w-full space-y-3">
+                        <Button 
+                            type="button"
+                            className="w-full py-6 text-base"
+                            onClick={openApprovalLink}
+                        >
+                            <ExternalLink className="mr-2 h-5 w-5" />
+                            Warpcast'i Aç ve Onayla
+                        </Button>
                     </div>
-                )}
+                 </>
+             ) : (
+                 <div className="w-full space-y-2">
+                    <div className="rounded-md bg-red-50 p-3 text-red-800 text-xs border border-red-200">
+                        <p className="font-bold mb-1">⚠️ HATA: Onay Linki Bulunamadı</p>
+                        <p>Signer oluşturuldu ancak API geçerli bir onay linki (URL) döndürmedi.</p>
+                        <p className="mt-2 font-semibold">API Yanıtı (Bunu geliştiriciye iletin):</p>
+                        <pre className="mt-1 bg-white p-2 rounded border overflow-x-auto max-h-32 text-[10px]">
+                            {JSON.stringify(debugData, null, 2)}
+                        </pre>
+                    </div>
+                 </div>
+             )}
+                
+             {!isPolling && approvalUrl && (
+                <div className="flex items-center justify-center gap-2 text-destructive text-xs">
+                    <AlertCircle className="h-3 w-3" /> 
+                    <span>Süre doldu. Lütfen "İptal Et" diyip tekrar deneyin.</span>
+                </div>
+             )}
 
-                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-destructive">
-                    İptal Et / Geri Dön
-                </Button>
-             </div>
+             <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-destructive">
+                İptal Et / Geri Dön
+             </Button>
            </div>
         ) : (
           // --- ADIM 3: TAMAMLA ---
