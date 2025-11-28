@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, Copy, Smartphone } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -100,7 +100,7 @@ export default function ProfileSetupModal() {
     setTimeout(() => {
         clearInterval(interval);
         if (!isApproved) setIsPolling(false);
-    }, 180000); // 3 minutes timeout
+    }, 180000);
   };
 
   const handleDisconnect = () => {
@@ -110,37 +110,22 @@ export default function ProfileSetupModal() {
       setIsPolling(false);
   };
 
+  // --- MOBİL DÜZELTME (Bu kısım arka planda çalışacak) ---
   const openApprovalLink = () => {
     if (!approvalUrl) return;
 
-    // Convert to warpcast:// scheme for mobile deep linking
+    // Linki 'https://client.farcaster.xyz/...' formatından 'warpcast://...' formatına çevir
+    // Bu işlem mobilde uygulamanın direk açılmasını sağlar.
     let mobileUrl = approvalUrl;
     if (approvalUrl.startsWith('https://client.farcaster.xyz/deeplinks/')) {
         mobileUrl = approvalUrl.replace('https://client.farcaster.xyz/deeplinks/', 'warpcast://');
     }
 
-    console.log("Opening Link:", mobileUrl);
-
     try {
-      // 1. Try SDK (Best for Frames)
       sdk.actions.openUrl(mobileUrl);
     } catch (e) {
-      console.log("SDK openUrl failed, trying fallbacks...");
-      // 2. Try window.open (Standard)
-      const opened = window.open(mobileUrl, '_blank');
-      
-      // 3. If popup blocked or failed, try location href (Last resort for mobile)
-      if (!opened) {
-          window.location.href = mobileUrl;
-      }
+      window.open(mobileUrl, '_blank');
     }
-  };
-
-  const copyLink = () => {
-      if (approvalUrl) {
-          navigator.clipboard.writeText(approvalUrl);
-          toast.success("Link copied to clipboard!");
-      }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -163,7 +148,7 @@ export default function ProfileSetupModal() {
 
   return (
     <Dialog open={true}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e: any) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e: any) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Welcome! 👋</DialogTitle>
           <DialogDescription>Create your profile to start using AutoShout.</DialogDescription>
@@ -172,67 +157,59 @@ export default function ProfileSetupModal() {
         {!signerUuid ? (
           // STEP 1: Connect
           <div className="flex flex-col items-center gap-4 py-4">
+            <div className="text-center">
+               <p className="mb-2 text-sm text-muted-foreground">You need to connect your Farcaster account to schedule casts.</p>
+            </div>
             <Button onClick={createSigner} disabled={isLoadingSigner} className="w-full" variant="outline">
               {isLoadingSigner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
               Connect Farcaster
             </Button>
           </div>
         ) : !isApproved ? (
-           // STEP 2: Approve
-           <div className="flex flex-col items-center gap-4 py-2">
-             <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm font-medium">
-                <Loader2 className="h-4 w-4 animate-spin" /> Waiting for Approval
-             </div>
+           // STEP 2: Approve (QR Kodsuz, Sade ve Çalışan Versiyon)
+           <div className="flex flex-col items-center gap-4 py-4">
+             <p className="text-sm font-medium text-yellow-600">Waiting for Approval...</p>
+             <p className="text-center text-xs text-muted-foreground">
+               Click the button below to open Warpcast and approve the signer.
+             </p>
              
-             {approvalUrl ? (
-                 <div className="w-full flex flex-col items-center gap-4">
-                    {/* QR Code - Only visible on Desktop (sm:block) */}
-                    <div className="bg-white p-2 rounded-lg border shadow-sm hidden sm:block">
-                        <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(approvalUrl)}`} 
-                            alt="Scan to Approve" 
-                            className="w-32 h-32"
-                        />
-                    </div>
-                    
-                    <div className="text-center space-y-1">
-                        <p className="text-xs text-muted-foreground hidden sm:block">
-                            Scan with your phone camera or
-                        </p>
-                        <p className="text-sm font-medium text-foreground sm:hidden flex items-center justify-center gap-1">
-                            <Smartphone className="h-4 w-4" /> Tap below to open Warpcast:
-                        </p>
-                    </div>
+             <div className="w-full space-y-2">
+                {/* DÜZELTME: Doğrudan <a> tagi yerine onClick eventi kullanıyoruz.
+                    Böylece linki 'warpcast://' formatına çevirip mobilde açılmasını sağlıyoruz.
+                */}
+                <Button className="w-full" onClick={openApprovalLink} disabled={!approvalUrl}>
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    {approvalUrl ? "Open Warpcast & Approve" : "Generating Link..."}
+                </Button>
+                
+                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
+                    Cancel
+                </Button>
+             </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                        {/* Mobile: Primary Action */}
-                        <Button onClick={openApprovalLink} className="w-full sm:order-2">
-                            <ExternalLink className="mr-2 h-4 w-4" /> Open Warpcast
-                        </Button>
-                        
-                        {/* Desktop/Backup: Copy Link */}
-                        <Button variant="outline" onClick={copyLink} className="w-full sm:order-1">
-                            <Copy className="mr-2 h-4 w-4" /> Copy Link
-                        </Button>
-                    </div>
-                 </div>
-             ) : (
-                 <div className="text-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                    <p className="text-xs mt-2 text-muted-foreground">Generating approval link...</p>
-                 </div>
-             )}
-
-             <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive mt-2">
-                Cancel
-             </Button>
+             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+               {isPolling ? <Loader2 className="h-3 w-3 animate-spin" /> : null} 
+               {isPolling ? "Checking status..." : "Timeout. Please try again."}
+             </div>
            </div>
         ) : (
           // STEP 3: Finalize
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700">
-                <CheckCircle2 className="h-4 w-4" /> Account Connected!
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    <CheckCircle2 className="h-4 w-4" /> Account Connected
+                </div>
+                <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleDisconnect}
+                    className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                >
+                    <LogOut className="mr-1 h-3 w-3" /> Connect different account
+                </Button>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Display Name</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. John Doe" />
