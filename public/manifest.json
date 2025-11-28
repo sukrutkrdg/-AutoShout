@@ -1,0 +1,31 @@
+{
+  "frame": {
+    "name": "Auto Shout",
+    "version": "1",
+    "iconUrl": "https://auto-shout-5u75.vercel.app/icon.png",
+    "homeUrl": "https://auto-shout-5u75.vercel.app",
+    "imageUrl": "https://auto-shout-5u75.vercel.app/image.png",
+    "buttonTitle": "Schedule Post",
+    "splashImageUrl": "https://auto-shout-5u75.vercel.app/splash.png",
+    "splashBackgroundColor": "#8b5cf6",
+    "webhookUrl": "https://auto-shout-5u75.vercel.app/api/webhook",
+    "subtitle": "Automated Farcaster post scheduling app",
+    "description": "AutoShout allows you to schedule and automatically publish your casts at any date and time. Manage your content calendar effortlessly",
+    "primaryCategory": "productivity",
+    "tags": [
+      "schedule",
+      "automation",
+      "productivity",
+      "tools"
+    ],
+    "tagline": "Automate Your Farcaster Posts",
+    "ogTitle": "AutoShout",
+    "ogDescription": "Schedule and automate your Farcaster casts",
+    "screenshotUrls": [
+      "https://auto-shout-5u75.vercel.app/screenshot1.png"
+    ],
+    "heroImageUrl": "https://auto-shout-5u75.vercel.app/splash.png",
+    "ogImageUrl": "https://auto-shout-5u75.vercel.app/icon.png",
+    "castShareUrl": "https://warpcast.com/~/frames/launch?url=https://auto-shout-5u75.vercel.app"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "network": "base",
+  "rpc_endpoints": {
+    "mainnet": "https://mainnet.base.org",
+    "testnet": "https://sepolia.base.org"
+  },
+  "chain_config": {
+    "mainnet": {
+      "chain_id": 8453,
+      "name": "Base",
+      "currency": {
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "explorer": "https://basescan.org"
+    },
+    "testnet": {
+      "chain_id": 84532,
+      "name": "Base Sepolia",
+      "currency": {
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "explorer": "https://sepolia.basescan.org"
+    }
+  },
+  "contracts": {
+    "scheduler": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "abi_path": "/contracts/AutoShoutScheduler.json",
+      "description": "Main scheduling contract for AutoShout posts"
+    },
+    "payment": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "abi_path": "/contracts/AutoShoutPayment.json",
+      "description": "Payment processing contract for premium subscriptions"
+    }
+  },
+  "farcaster_integration": {
+    "api_endpoint": "https://api.warpcast.com/v2",
+    "mini_app_id": "autoshout",
+    "webhook_secret": "your-webhook-secret-here",
+    "supported_features": [
+      "cast_scheduling",
+      "media_upload",
+      "calendar_view",
+      "premium_subscriptions"
+    ]
+  },
+  "gas_settings": {
+    "max_priority_fee_per_gas": "1000000000",
+    "max_fee_per_gas": "2000000000",
+    "gas_limit": "500000"
+  },
+  "feature_flags": {
+    "enable_media_upload": true,
+    "enable_premium_features": true,
+    "enable_analytics": true,
+    "max_free_posts_per_week": 10,
+    "max_premium_posts_per_week": 100
+  }
+}

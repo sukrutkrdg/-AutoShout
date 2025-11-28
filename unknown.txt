@@ -1,0 +1,12 @@
+
+## Post-Deployment
+
+1. Monitor contract events on BaseScan
+2. Set up error tracking (Sentry, etc.)
+3. Configure analytics
+4. Set up monitoring alerts
+5. Document support procedures
+
+## Support
+
+For deployment issues, see `README_Farcaster.md` or contact support.
