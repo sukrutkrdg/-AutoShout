@@ -5,15 +5,15 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  root: '.', // Proje kök dizini (burada index.html aranır)
-  publicDir: '../public', // Eğer public klasörü frontend dışında ise
+  root: '.', 
+  // publicDir satırını SİLİN (Varsayılan olarak zaten ./public klasörüne bakar)
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
-    host: true, // Ağ üzerinden erişime izin ver (bazen localhost sorunlarını çözer)
+    host: true,
     port: 5173,
   }
 })
