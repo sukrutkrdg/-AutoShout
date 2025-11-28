@@ -1,13 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ScheduledPost, UserProfile } from '../lib/types';
-import sdk from '@farcaster/frame-sdk'; // DÜZELTME: Doğrudan SDK import edildi
+import sdk from '@farcaster/frame-sdk';
 import { supabase } from '../lib/supabase';
 
 // --- YARDIMCI FONKSİYON ---
 async function getCurrentFid(): Promise<number> {
-    // DÜZELTME: initFarcaster yerine doğrudan context'e erişim.
-    // initFarcaster sürekli sdk.actions.ready() çağırdığı için performans sorunu yaratıyordu.
     const context = await sdk.context;
     
     // Dev modunda tarayıcıda test ederken hata almamak için sahte ID
@@ -99,9 +97,9 @@ export function useGetUserScheduledPosts() {
             content: p.content,
             // Medya varsa url objesi oluştur, yoksa undefined
             media: p.media_url ? { url: p.media_url } : undefined,
-            // DÜZELTME: Number() yerine new Date().getTime() kullanıldı.
-            // Supabase timestamp'leri string olarak döndüğü için Number() NaN veriyordu.
-            scheduledTime: new Date(p.scheduled_time).getTime(), 
+            // DB'den bigint (sayı) geliyor, bunu Date objesine veya doğrudan sayıya çeviriyoruz.
+            // Eğer DB'de bigint ise p.scheduled_time zaten bir sayı veya string sayı olabilir.
+            scheduledTime: Number(p.scheduled_time), 
             status: p.status,
             createdAt: new Date(p.created_at).getTime(),
             updatedAt: Date.now(),
@@ -129,8 +127,9 @@ export function useCreateScheduledPost() {
         .insert({
             user_fid: fid,
             content: post.content,
-            // DÜZELTME: Timestamp sütunu için ISO string gönderimi daha güvenlidir
-            scheduled_time: new Date(post.scheduledTime).toISOString(),
+            // DÜZELTME: Veritabanında sütun tipi 'bigint' olduğu için
+            // buraya string (ISO) değil, sayısal değer (timestamp) gönderiyoruz.
+            scheduled_time: post.scheduledTime, 
             status: 'pending'
         });
 
