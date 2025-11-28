@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
+import { toast } from 'sonner';
 
 export default function ProfileSetupModal() {
   const { data: userProfile, isLoading: isProfileLoading } = useGetCallerUserProfile();
@@ -35,6 +36,25 @@ export default function ProfileSetupModal() {
     }
   }, [userProfile]);
 
+  // Otomatik Kayıt Fonksiyonu
+  // Onay gelir gelmez veritabanına yazar, böylece UUID kaybolmaz.
+  const handleAutoSave = (approvedUuid: string) => {
+    const finalName = name.trim() || userProfile?.name || 'User';
+    const finalHandle = farcasterHandle.trim() || userProfile?.farcasterHandle || 'user';
+
+    saveProfile.mutate({
+      name: finalName,
+      farcasterHandle: finalHandle.replace('@', ''),
+      isPremium: false,
+      createdAt: Date.now(),
+      signerUuid: approvedUuid
+    }, {
+        onSuccess: () => {
+            toast.success("Hesap bağlandı ve kaydedildi! 🎉");
+        }
+    });
+  };
+
   // 1. Signer Oluşturma Fonksiyonu
   const createSigner = async () => {
     setIsLoadingSigner(true);
@@ -61,6 +81,7 @@ export default function ProfileSetupModal() {
 
     } catch (e) {
       console.error("Failed to create signer:", e);
+      toast.error("Signer oluşturulamadı.");
     } finally {
       setIsLoadingSigner(false);
     }
@@ -77,6 +98,10 @@ export default function ProfileSetupModal() {
           setIsApproved(true);
           setIsPolling(false);
           clearInterval(interval); // Stop polling
+          
+          // --- OTOMATİK KAYIT ---
+          // Onaylandığı an kaydet
+          handleAutoSave(uuid);
         }
       } catch (e) {
         console.error("Polling error:", e);
@@ -96,11 +121,9 @@ export default function ProfileSetupModal() {
       setApprovalUrl(null);
       setIsApproved(false);
       setIsPolling(false);
-      // İstersen burada veritabanından da signer_uuid'yi silebilirsin,
-      // ama şimdilik sadece frontend state'ini sıfırlıyoruz.
   };
 
-  // 3. Handle Form Submit
+  // 3. Handle Form Submit (Manual Save)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !farcasterHandle.trim()) return;
@@ -121,10 +144,6 @@ export default function ProfileSetupModal() {
   };
   
   if (isProfileLoading) return null; // Yüklenirken boş göster
-
-  // Eğer zaten kayıtlıysa ve signer'ı varsa modalı gösterme (veya sadece düzenleme modu açılabilir)
-  // Ancak "ilk kurulum" mantığı olduğu için şimdilik her zaman açık bırakıyoruz.
-  // Kullanıcı UX'ini iyileştirmek için istersen buraya `if (userProfile?.signerUuid) return null;` ekleyebilirsin.
 
   return (
     <Dialog open={true}>
@@ -156,11 +175,17 @@ export default function ProfileSetupModal() {
              </p>
              
              <div className="w-full space-y-2">
-                <Button asChild className="w-full">
-                    <a href={approvalUrl!} target="_blank" rel="noreferrer">
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Onaylamak için Tıkla
-                    </a>
+                <Button 
+                    type="button"
+                    className="w-full"
+                    onClick={() => {
+                        if (approvalUrl) {
+                            sdk.actions.openUrl(approvalUrl);
+                        }
+                    }}
+                >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Onaylamak için Tıkla (Warpcast Açılır)
                 </Button>
                 
                 <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
@@ -213,7 +238,7 @@ export default function ProfileSetupModal() {
             </div>
             <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
               {saveProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Kaydı Tamamla
+              Kaydı Güncelle / Tamamla
             </Button>
           </form>
         )}

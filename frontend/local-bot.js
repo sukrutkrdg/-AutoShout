@@ -25,6 +25,7 @@ if (!SUPABASE_ADMIN_KEY) {
 }
 
 // --- Bağlantılar ---
+// Service Role Key ile Supabase Client oluştur (RLS bypass)
 const supabase = createClient(SUPABASE_URL, SUPABASE_ADMIN_KEY);
 const neynarClient = new NeynarAPIClient(new Configuration({ apiKey: NEYNAR_KEY }));
 const processingCache = new Set();
@@ -81,6 +82,8 @@ async function checkAndPublish() {
                     // --- ADIM 2: AKILLI KONTROL (Farcaster'da var mı?) ---
                     try {
                         if (post.user_fid) {
+                            // Neynar API ile kullanıcının son gönderilerini kontrol et
+                            // Bu adım duplicate (tekrar) gönderimi engellemek için opsiyonel bir güvenlik katmanıdır.
                             const feed = await neynarClient.fetchCastsForUser(post.user_fid, { limit: 10 });
                             
                             const alreadyPosted = feed.casts.some(cast => 
@@ -99,7 +102,7 @@ async function checkAndPublish() {
                     // --- ADIM 3: GÖNDERİM (Kullanıcının Anahtarıyla) ---
                     if (shouldPublish) {
                         await neynarClient.publishCast({
-                            signerUuid: userSignerUuid, // <--- DİNAMİK ANAHTAR
+                            signerUuid: userSignerUuid, // <--- KULLANICININ ONAYLANMIŞ ANAHTARI
                             text: post.content,
                         });
                         console.log(`   ✅ Cast başarıyla gönderildi.`);
