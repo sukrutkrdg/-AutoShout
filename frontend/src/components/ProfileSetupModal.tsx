@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSaveCallerUserProfile, useGetCallerUserProfile } from '../hooks/useQueries';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, Copy } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, Copy, Smartphone } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -14,14 +14,19 @@ export default function ProfileSetupModal() {
   const [name, setName] = useState('');
   const [farcasterHandle, setFarcasterHandle] = useState('');
   
+  // Signer States
   const [signerUuid, setSignerUuid] = useState<string | null>(null);
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isLoadingSigner, setIsLoadingSigner] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
 
+  // Polling interval referansı (temizlemek için)
+  const pollingInterval = useRef<NodeJS.Timeout | null>(null);
+
   const saveProfile = useSaveCallerUserProfile();
 
+  // Mevcut profil varsa state'i doldur
   useEffect(() => {
     if (userProfile) {
       setName(userProfile.name || '');
@@ -32,6 +37,19 @@ export default function ProfileSetupModal() {
       }
     }
   }, [userProfile]);
+
+  // Component unmount olduğunda polling'i durdur
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
+
+  const stopPolling = () => {
+    if (pollingInterval.current) {
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
+    setIsPolling(false);
+  };
 
   const handleAutoSave = (approvedUuid: string) => {
     const finalName = name.trim() || userProfile?.name || 'User';
@@ -61,7 +79,7 @@ export default function ProfileSetupModal() {
       if (data.signer_uuid) {
           setSignerUuid(data.signer_uuid);
           
-          // Linki yakala
+          // Linki yakala (farklı isimlerle gelebilir)
           const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
           if (url) setApprovalUrl(url);
 
@@ -79,12 +97,15 @@ export default function ProfileSetupModal() {
   };
 
   const pollSignerStatus = async (uuid: string) => {
-    const interval = setInterval(async () => {
+    // Varsa eski polling'i temizle
+    stopPolling();
+
+    pollingInterval.current = setInterval(async () => {
       try {
         const res = await fetch(`/api/signer?signer_uuid=${uuid}`);
         const data = await res.json();
         
-        // Link sonradan gelirse yakala
+        // Link sonradan gelirse yakala (bazen gecikmeli gelir)
         if (!approvalUrl) {
             const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
             if (url) setApprovalUrl(url);
@@ -92,16 +113,18 @@ export default function ProfileSetupModal() {
 
         if (data.status === 'approved') {
           setIsApproved(true);
-          setIsPolling(false);
-          clearInterval(interval);
-          handleAutoSave(uuid);
+          stopPolling(); // Polling'i durdur
+          handleAutoSave(uuid); // Otomatik kaydet
         }
       } catch (e) { console.error(e); }
     }, 2000); 
     
+    // 3 dakika sonra zaman aşımı
     setTimeout(() => {
-        clearInterval(interval);
-        if (!isApproved) setIsPolling(false);
+        if (isPolling) {
+            stopPolling();
+            toast.error("Connection timed out. Please try again.");
+        }
     }, 180000);
   };
 
@@ -109,14 +132,14 @@ export default function ProfileSetupModal() {
       setSignerUuid(null);
       setApprovalUrl(null);
       setIsApproved(false);
-      setIsPolling(false);
+      stopPolling();
   };
 
-  // --- SİHİRLİ MOBİL LİNK DÜZELTMESİ ---
+  // --- GELİŞMİŞ MOBİL LİNK AÇMA ---
   const openApprovalLink = () => {
     if (!approvalUrl) return;
 
-    // 1. Linki mobil uygulama şemasına (warpcast://) çevir
+    // 1. Mobil Uygulama Şeması (Deep Link)
     let mobileUrl = approvalUrl;
     if (approvalUrl.startsWith('https://client.farcaster.xyz/deeplinks/')) {
         mobileUrl = approvalUrl.replace('https://client.farcaster.xyz/deeplinks/', 'warpcast://');
@@ -125,16 +148,15 @@ export default function ProfileSetupModal() {
     console.log("Attempting to open:", mobileUrl);
 
     try {
-      // 2. Önce SDK ile açmayı dene (En temiz yöntem)
+      // 2. Önce SDK ile açmayı dene (Farcaster Frame içindeysek en iyisi budur)
       sdk.actions.openUrl(mobileUrl);
     } catch (e) {
       console.log("SDK failed, trying window methods...");
       
-      // 3. SDK çalışmazsa standart yöntemleri dene
-      // window.open bazen popup blocker'a takılır, bu yüzden...
+      // 3. SDK çalışmazsa (örneğin normal tarayıcıda), window.open dene
       const opened = window.open(mobileUrl, '_blank');
       
-      // 4. window.open da çalışmazsa sayfayı direkt yönlendir (Kesin çözüm)
+      // 4. window.open da engellenirse (popup blocker), sayfayı yönlendir
       if (!opened) {
           window.location.href = mobileUrl;
       }
@@ -175,7 +197,7 @@ export default function ProfileSetupModal() {
         </DialogHeader>
 
         {!signerUuid ? (
-          // BAĞLANMA EKRANI
+          // STEP 1: BAĞLANMA BUTONU
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="text-center">
                <p className="mb-2 text-sm text-muted-foreground">You need to connect your Farcaster account to schedule casts.</p>
@@ -186,38 +208,58 @@ export default function ProfileSetupModal() {
             </Button>
           </div>
         ) : !isApproved ? (
-           // ONAY BEKLEME EKRANI
-           <div className="flex flex-col items-center gap-4 py-4">
-             <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full">
+           // STEP 2: ONAY BEKLEME EKRANI
+           <div className="flex flex-col items-center gap-4 py-2">
+             <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm font-medium">
                 <Loader2 className="h-4 w-4 animate-spin" /> 
-                <span className="text-sm font-medium">Waiting for Approval</span>
+                <span>Waiting for Approval</span>
              </div>
              
-             <div className="text-center px-4 space-y-2">
-               <p className="text-xs text-muted-foreground">
-                 Tap the button below to open Warpcast and approve the signer.
-               </p>
-             </div>
-             
-             <div className="w-full space-y-2">
-                {/* BU BUTON ARTIK MOBİLDE KESİN ÇALIŞIR */}
-                <Button className="w-full py-6 text-base" onClick={openApprovalLink} disabled={!approvalUrl}>
-                    <ExternalLink className="mr-2 h-5 w-5" />
-                    {approvalUrl ? "Open Warpcast & Approve" : "Generating Link..."}
-                </Button>
-                
-                {/* Yedek olarak Kopyala butonu */}
-                <Button variant="outline" onClick={copyLink} className="w-full" disabled={!approvalUrl}>
-                    <Copy className="mr-2 h-4 w-4" /> Copy Link (Backup)
-                </Button>
+             {approvalUrl ? (
+                 <div className="w-full flex flex-col items-center gap-4">
+                    {/* QR Kod - Sadece Masaüstünde Göster (hidden sm:block) */}
+                    <div className="bg-white p-2 rounded-lg border shadow-sm hidden sm:block">
+                        <img 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(approvalUrl)}`} 
+                            alt="Scan to Approve" 
+                            className="w-32 h-32"
+                        />
+                    </div>
+                    
+                    <div className="text-center space-y-1">
+                        <p className="text-xs text-muted-foreground hidden sm:block">
+                            Scan with your phone camera or
+                        </p>
+                        <p className="text-sm font-medium text-foreground sm:hidden flex items-center justify-center gap-1">
+                            <Smartphone className="h-4 w-4" /> Tap below to open Warpcast:
+                        </p>
+                    </div>
 
-                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
-                    Cancel
-                </Button>
-             </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                        {/* Mobilde Ana Aksiyon: Uygulamayı Aç */}
+                        <Button onClick={openApprovalLink} className="w-full sm:order-2">
+                            <ExternalLink className="mr-2 h-4 w-4" /> Open Warpcast
+                        </Button>
+                        
+                        {/* Masaüstü/Yedek: Linki Kopyala */}
+                        <Button variant="outline" onClick={copyLink} className="w-full sm:order-1">
+                            <Copy className="mr-2 h-4 w-4" /> Copy Link
+                        </Button>
+                    </div>
+                 </div>
+             ) : (
+                 <div className="text-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                    <p className="text-xs mt-2 text-muted-foreground">Generating approval link...</p>
+                 </div>
+             )}
+
+             <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive mt-2">
+                Cancel
+             </Button>
            </div>
         ) : (
-          // KAYIT TAMAMLAMA EKRANI
+          // STEP 3: PROFİL BİLGİLERİNİ TAMAMLA
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700">
                 <CheckCircle2 className="h-4 w-4" /> Account Connected!

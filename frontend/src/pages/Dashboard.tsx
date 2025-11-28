@@ -15,7 +15,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user }: DashboardProps) {
-  // EKLENDİ: isLoading durumunu da çekiyoruz ki sayfa yüklenirken modal açılmasın
+  // EKLENDİ: isLoading durumunu da çekiyoruz ki sayfa yüklenirken modal aniden açılmasın
   const { data: userProfile, isLoading: isProfileLoading } = useGetCallerUserProfile();
   const { data: posts = [] } = useGetUserScheduledPosts();
   const { data: remainingPosts } = useGetRemainingWeeklyPosts();
