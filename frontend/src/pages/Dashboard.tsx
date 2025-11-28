@@ -7,7 +7,7 @@ import { Clock, CheckCircle2, XCircle, Plus, Zap } from 'lucide-react';
 import PostScheduler from '../components/PostScheduler';
 import PostsList from '../components/PostsList';
 import CalendarView from '../components/CalendarView';
-import ProfileSetupModal from '../components/ProfileSetupModal'; // Giriş ekranı eklendi
+import ProfileSetupModal from '../components/ProfileSetupModal'; // EKLENDİ: Giriş ekranı bileşeni
 import { FarcasterUser } from '../lib/farcaster';
 
 interface DashboardProps {
@@ -15,12 +15,14 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user }: DashboardProps) {
+  // EKLENDİ: isLoading durumunu da çekiyoruz ki sayfa yüklenirken modal açılmasın
   const { data: userProfile, isLoading: isProfileLoading } = useGetCallerUserProfile();
   const { data: posts = [] } = useGetUserScheduledPosts();
   const { data: remainingPosts } = useGetRemainingWeeklyPosts();
   const [showScheduler, setShowScheduler] = useState(false);
 
-  // --- KRİTİK EKLEME: Kullanıcı bağlı değilse Modalı göster ---
+  // --- EKLENDİ: Giriş Kontrol Mantığı ---
+  // Profil yüklenmişse VE (profil yoksa VEYA signer_uuid yoksa) -> Giriş ekranını aç
   const showSetupModal = !isProfileLoading && (!userProfile || !userProfile.signerUuid);
 
   const pendingPosts = posts.filter(p => p.status === 'pending');
@@ -28,13 +30,12 @@ export default function Dashboard({ user }: DashboardProps) {
   const failedPosts = posts.filter(p => p.status === 'failed');
 
   const weeklyLimit = userProfile?.isPremium ? 100 : 10;
-  // Sayısal dönüşüm hatasını önlemek için güvenli çeviri
   const usedPosts = weeklyLimit - Number(remainingPosts || 0);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       
-      {/* Eğer yetki yoksa bu ekran açılır */}
+      {/* EKLENDİ: Giriş yapılmamışsa modalı göster */}
       {showSetupModal && <ProfileSetupModal />}
 
       <div className="mb-8">
@@ -50,7 +51,7 @@ export default function Dashboard({ user }: DashboardProps) {
         </div>
       </div>
 
-      {/* İSTATİSTİK KARTLARI (ESKİ GÜZEL GÖRÜNÜM) */}
+      {/* İSTATİSTİK KARTLARI (Tasarım Aynen Korundu) */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
