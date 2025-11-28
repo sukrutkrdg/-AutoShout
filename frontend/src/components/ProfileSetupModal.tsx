@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle, Copy } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, Copy, Smartphone } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -45,7 +45,7 @@ export default function ProfileSetupModal() {
       signerUuid: approvedUuid
     }, {
         onSuccess: () => {
-            toast.success("Hesap bağlandı ve kaydedildi! 🎉");
+            toast.success("Account connected successfully! 🎉");
         }
     });
   };
@@ -56,7 +56,7 @@ export default function ProfileSetupModal() {
       const res = await fetch('/api/signer', { method: 'POST' });
       const data = await res.json();
       
-      console.log("🔥 API Yanıtı:", data);
+      console.log("🔥 API Response:", data);
 
       if (data.signer_uuid) {
           setSignerUuid(data.signer_uuid);
@@ -67,11 +67,11 @@ export default function ProfileSetupModal() {
           setIsPolling(true);
           pollSignerStatus(data.signer_uuid);
       } else {
-          toast.error("Signer UUID alınamadı.");
+          toast.error("Failed to get Signer UUID.");
       }
     } catch (e) {
-      console.error("Hata:", e);
-      toast.error("İşlem başarısız.");
+      console.error("Error:", e);
+      toast.error("Failed to create signer.");
     } finally {
       setIsLoadingSigner(false);
     }
@@ -84,7 +84,7 @@ export default function ProfileSetupModal() {
         const data = await res.json();
         
         if (!approvalUrl) {
-            const url = data.signer_approval_url || data.link || data.url;
+            const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
             if (url) setApprovalUrl(url);
         }
 
@@ -100,7 +100,7 @@ export default function ProfileSetupModal() {
     setTimeout(() => {
         clearInterval(interval);
         if (!isApproved) setIsPolling(false);
-    }, 180000);
+    }, 180000); // 3 minutes timeout
   };
 
   const handleDisconnect = () => {
@@ -112,17 +112,34 @@ export default function ProfileSetupModal() {
 
   const openApprovalLink = () => {
     if (!approvalUrl) return;
+
+    // Convert to warpcast:// scheme for mobile deep linking
+    let mobileUrl = approvalUrl;
+    if (approvalUrl.startsWith('https://client.farcaster.xyz/deeplinks/')) {
+        mobileUrl = approvalUrl.replace('https://client.farcaster.xyz/deeplinks/', 'warpcast://');
+    }
+
+    console.log("Opening Link:", mobileUrl);
+
     try {
-      sdk.actions.openUrl(approvalUrl);
+      // 1. Try SDK (Best for Frames)
+      sdk.actions.openUrl(mobileUrl);
     } catch (e) {
-      window.open(approvalUrl, '_blank');
+      console.log("SDK openUrl failed, trying fallbacks...");
+      // 2. Try window.open (Standard)
+      const opened = window.open(mobileUrl, '_blank');
+      
+      // 3. If popup blocked or failed, try location href (Last resort for mobile)
+      if (!opened) {
+          window.location.href = mobileUrl;
+      }
     }
   };
 
   const copyLink = () => {
       if (approvalUrl) {
           navigator.clipboard.writeText(approvalUrl);
-          toast.success("Link kopyalandı!");
+          toast.success("Link copied to clipboard!");
       }
   };
 
@@ -130,7 +147,7 @@ export default function ProfileSetupModal() {
     e.preventDefault();
     if (!name.trim() || !farcasterHandle.trim()) return;
     if (!signerUuid || !isApproved) {
-        toast.warning("Lütfen önce Farcaster hesabınızı bağlayın.");
+        toast.warning("Please connect your Farcaster account first.");
         return;
     }
     saveProfile.mutate({
@@ -148,72 +165,84 @@ export default function ProfileSetupModal() {
     <Dialog open={true}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e: any) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Hoşgeldin! 👋</DialogTitle>
-          <DialogDescription>AutoShout'u kullanmak için profilini oluştur.</DialogDescription>
+          <DialogTitle>Welcome! 👋</DialogTitle>
+          <DialogDescription>Create your profile to start using AutoShout.</DialogDescription>
         </DialogHeader>
 
         {!signerUuid ? (
+          // STEP 1: Connect
           <div className="flex flex-col items-center gap-4 py-4">
             <Button onClick={createSigner} disabled={isLoadingSigner} className="w-full" variant="outline">
               {isLoadingSigner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
-              Farcaster Hesabını Bağla
+              Connect Farcaster
             </Button>
           </div>
         ) : !isApproved ? (
+           // STEP 2: Approve
            <div className="flex flex-col items-center gap-4 py-2">
              <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm font-medium">
-                <Loader2 className="h-4 w-4 animate-spin" /> Onay Bekleniyor
+                <Loader2 className="h-4 w-4 animate-spin" /> Waiting for Approval
              </div>
              
              {approvalUrl ? (
                  <div className="w-full flex flex-col items-center gap-4">
-                    {/* QR KOD ALANI */}
-                    <div className="bg-white p-2 rounded-lg border shadow-sm">
+                    {/* QR Code - Only visible on Desktop (sm:block) */}
+                    <div className="bg-white p-2 rounded-lg border shadow-sm hidden sm:block">
                         <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(approvalUrl)}`} 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(approvalUrl)}`} 
                             alt="Scan to Approve" 
-                            className="w-40 h-40"
+                            className="w-32 h-32"
                         />
                     </div>
-                    <p className="text-center text-xs text-muted-foreground">
-                        Telefon kameranızla bu kodu okutun<br/>veya linki kopyalayıp mobilde açın.
-                    </p>
+                    
+                    <div className="text-center space-y-1">
+                        <p className="text-xs text-muted-foreground hidden sm:block">
+                            Scan with your phone camera or
+                        </p>
+                        <p className="text-sm font-medium text-foreground sm:hidden flex items-center justify-center gap-1">
+                            <Smartphone className="h-4 w-4" /> Tap below to open Warpcast:
+                        </p>
+                    </div>
 
-                    <div className="grid grid-cols-2 gap-2 w-full">
-                        <Button variant="outline" onClick={copyLink} className="w-full">
-                            <Copy className="mr-2 h-4 w-4" /> Linki Kopyala
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                        {/* Mobile: Primary Action */}
+                        <Button onClick={openApprovalLink} className="w-full sm:order-2">
+                            <ExternalLink className="mr-2 h-4 w-4" /> Open Warpcast
                         </Button>
-                        <Button onClick={openApprovalLink} className="w-full">
-                            <ExternalLink className="mr-2 h-4 w-4" /> Mobilde Aç
+                        
+                        {/* Desktop/Backup: Copy Link */}
+                        <Button variant="outline" onClick={copyLink} className="w-full sm:order-1">
+                            <Copy className="mr-2 h-4 w-4" /> Copy Link
                         </Button>
                     </div>
                  </div>
              ) : (
                  <div className="text-center py-4">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                    <p className="text-xs mt-2 text-muted-foreground">Onay linki oluşturuluyor...</p>
+                    <p className="text-xs mt-2 text-muted-foreground">Generating approval link...</p>
                  </div>
              )}
 
              <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive mt-2">
-                İptal Et
+                Cancel
              </Button>
            </div>
         ) : (
+          // STEP 3: Finalize
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700">
-                <CheckCircle2 className="h-4 w-4" /> Hesap Başarıyla Bağlandı
+                <CheckCircle2 className="h-4 w-4" /> Account Connected!
             </div>
             <div className="space-y-2">
-              <Label htmlFor="name">Görünen Adın</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Label htmlFor="name">Display Name</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. John Doe" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="farcaster">Kullanıcı Adın</Label>
-              <Input id="farcaster" value={farcasterHandle} onChange={(e) => setFarcasterHandle(e.target.value)} required />
+              <Label htmlFor="farcaster">Username</Label>
+              <Input id="farcaster" value={farcasterHandle} onChange={(e) => setFarcasterHandle(e.target.value)} required placeholder="john" />
             </div>
             <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
-              {saveProfile.isPending ? "Kaydediliyor..." : "Kaydı Tamamla"}
+              {saveProfile.isPending ? "Saving..." : "Complete Setup"}
             </Button>
           </form>
         )}
