@@ -1,7 +1,7 @@
 import { useGetCallerUserProfile } from '../hooks/useQueries';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { FarcasterUser } from '../lib/farcaster';
@@ -14,8 +14,11 @@ export default function Header({ user }: HeaderProps) {
   const { data: userProfile } = useGetCallerUserProfile();
   const { theme, setTheme } = useTheme();
 
-  const getInitials = (name: string) => {
+  // DÜZELTME: Parametre tipi genişletildi ve null kontrolü eklendi.
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return 'U'; // İsim yoksa varsayılan harf
     return name
+      .trim() // Başındaki/sonundaki boşlukları temizle
       .split(' ')
       .map(n => n[0])
       .join('')
@@ -52,7 +55,8 @@ export default function Header({ user }: HeaderProps) {
                   <Avatar>
                     <AvatarImage src={user.pfpUrl} alt={user.displayName} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {userProfile ? getInitials(userProfile.name) : getInitials(user.displayName || 'U')}
+                      {/* DÜZELTME: getInitials artık null değerleri güvenle işleyebilir */}
+                      {userProfile ? getInitials(userProfile.name) : getInitials(user.displayName)}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -60,7 +64,7 @@ export default function Header({ user }: HeaderProps) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{user.displayName}</p>
+                    <p className="text-sm font-medium">{user.displayName || 'User'}</p>
                     <p className="text-xs text-muted-foreground">@{user.username}</p>
                     {userProfile?.isPremium && (
                       <span className="inline-flex w-fit items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">

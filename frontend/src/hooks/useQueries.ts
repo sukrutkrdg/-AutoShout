@@ -1,16 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ScheduledPost, UserProfile } from '../lib/types';
-import { initFarcaster } from '../lib/farcaster';
+import sdk from '@farcaster/frame-sdk'; // DÜZELTME: Doğrudan SDK import edildi
 import { supabase } from '../lib/supabase';
 
 // --- YARDIMCI FONKSİYON ---
 async function getCurrentFid(): Promise<number> {
-    const user = await initFarcaster();
+    // DÜZELTME: initFarcaster yerine doğrudan context'e erişim.
+    // initFarcaster sürekli sdk.actions.ready() çağırdığı için performans sorunu yaratıyordu.
+    const context = await sdk.context;
+    
     // Dev modunda tarayıcıda test ederken hata almamak için sahte ID
-    if (!user && import.meta.env.DEV) return 1; 
-    if (!user) throw new Error("User session not found");
-    return user.fid;
+    if ((!context || !context.user) && import.meta.env.DEV) return 1; 
+    
+    if (!context || !context.user) throw new Error("User session not found");
+    return context.user.fid;
 }
 
 // --- HOOKS ---
@@ -32,7 +36,7 @@ export function useGetCallerUserProfile() {
         return null;
       }
 
-      // 🔥 DÜZELTME BURADA: Veritabanı (snake_case) -> Uygulama (camelCase) Eşleşmesi
+      // Veritabanı (snake_case) -> Uygulama (camelCase) Eşleşmesi
       if (data) {
         return {
             name: data.display_name,       // DB: display_name -> App: name
@@ -95,7 +99,9 @@ export function useGetUserScheduledPosts() {
             content: p.content,
             // Medya varsa url objesi oluştur, yoksa undefined
             media: p.media_url ? { url: p.media_url } : undefined,
-            scheduledTime: Number(p.scheduled_time), 
+            // DÜZELTME: Number() yerine new Date().getTime() kullanıldı.
+            // Supabase timestamp'leri string olarak döndüğü için Number() NaN veriyordu.
+            scheduledTime: new Date(p.scheduled_time).getTime(), 
             status: p.status,
             createdAt: new Date(p.created_at).getTime(),
             updatedAt: Date.now(),
@@ -123,7 +129,8 @@ export function useCreateScheduledPost() {
         .insert({
             user_fid: fid,
             content: post.content,
-            scheduled_time: post.scheduledTime,
+            // DÜZELTME: Timestamp sütunu için ISO string gönderimi daha güvenlidir
+            scheduled_time: new Date(post.scheduledTime).toISOString(),
             status: 'pending'
         });
 
