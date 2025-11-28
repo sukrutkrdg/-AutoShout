@@ -1,127 +1,58 @@
-import { useState } from 'react';
-import { useGetCallerUserProfile, useGetUserScheduledPosts, useGetRemainingWeeklyPosts } from '../hooks/useQueries';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Clock, CheckCircle2, XCircle, Plus, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useGetCallerUserProfile } from '../hooks/useQueries';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 import PostScheduler from '../components/PostScheduler';
 import PostsList from '../components/PostsList';
 import CalendarView from '../components/CalendarView';
-import { FarcasterUser } from '../lib/farcaster';
+import ProfileSetupModal from '../components/ProfileSetupModal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2 } from 'lucide-react';
 
-interface DashboardProps {
-  user: FarcasterUser | null;
-}
+export default function Dashboard() {
+  const { data: profile, isLoading } = useGetCallerUserProfile();
+  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
+  
+  // Modal kontrolü: Profil yoksa VEYA profil var ama Signer yetkisi yoksa aç
+  const showSetupModal = !isLoading && (!profile || !profile.signerUuid);
 
-export default function Dashboard({ user }: DashboardProps) {
-  const { data: userProfile } = useGetCallerUserProfile();
-  const { data: posts = [] } = useGetUserScheduledPosts();
-  const { data: remainingPosts } = useGetRemainingWeeklyPosts();
-  const [showScheduler, setShowScheduler] = useState(false);
-
-  const pendingPosts = posts.filter(p => p.status === 'pending');
-  const publishedPosts = posts.filter(p => p.status === 'published');
-  const failedPosts = posts.filter(p => p.status === 'failed');
-
-  const weeklyLimit = userProfile?.isPremium ? 100 : 10;
-  const usedPosts = weeklyLimit - Number(remainingPosts || BigInt(0));
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Manage your scheduled casts</p>
-          </div>
-          <Button onClick={() => setShowScheduler(true)} size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
-            Schedule New Cast
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Eğer yetki yoksa Modalı zorla göster */}
+      {showSetupModal && <ProfileSetupModal />}
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingPosts.length}</div>
-            <p className="text-xs text-muted-foreground">Waiting to be published</p>
-          </CardContent>
-        </Card>
+      <Header onOpenScheduler={() => setIsSchedulerOpen(true)} />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Published</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{publishedPosts.length}</div>
-            <p className="text-xs text-muted-foreground">Successfully published</p>
-          </CardContent>
-        </Card>
+      <main className="container mx-auto max-w-2xl p-4">
+        <Tabs defaultValue="list" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="list">Gönderiler</TabsTrigger>
+            <TabsTrigger value="calendar">Takvim</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="list" className="mt-4">
+            <PostsList />
+          </TabsContent>
+          
+          <TabsContent value="calendar" className="mt-4">
+            <CalendarView />
+          </TabsContent>
+        </Tabs>
+      </main>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed</CardTitle>
-            <XCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{failedPosts.length}</div>
-            <p className="text-xs text-muted-foreground">Could not be published</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Weekly Quota</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{usedPosts}/{weeklyLimit}</div>
-            <p className="text-xs text-muted-foreground">
-              {userProfile?.isPremium ? 'Premium' : 'Free'} plan
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {!userProfile?.isPremium && (
-        <Card className="mb-8 border-primary/50 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              Upgrade to Premium
-            </CardTitle>
-            <div className="text-sm text-muted-foreground">
-              Schedule 100 casts per week, get priority support, and access more features.
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button variant="default">Upgrade</Button>
-          </CardContent>
-        </Card>
+      {isSchedulerOpen && (
+        <PostScheduler onClose={() => setIsSchedulerOpen(false)} />
       )}
-
-      <Tabs defaultValue="list" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="list">List View</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="list" className="space-y-4">
-          <PostsList posts={posts} />
-        </TabsContent>
-
-        <TabsContent value="calendar" className="space-y-4">
-          <CalendarView posts={posts} />
-        </TabsContent>
-      </Tabs>
-
-      {showScheduler && <PostScheduler onClose={() => setShowScheduler(false)} />}
+      
+      <Footer />
     </div>
   );
 }
