@@ -1,92 +1,139 @@
+import { createClient } from '@supabase/supabase-js';
 import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
-import { mnemonicToAccount } from 'viem/accounts';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const config = new Configuration({
-  apiKey: process.env.NEYNAR_API_KEY,
-});
-const client = new NeynarAPIClient(config);
+// --- Ayarları Yükle ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-export default async function handler(req, res) {
-  // --- YENİ SIGNER OLUŞTURMA (POST) ---
-  if (req.method === 'POST') {
-    try {
-      console.log("📝 Yeni Signer isteği alındı...");
+console.log("\n🤖 AutoShout Akıllı Bot (Çok Kullanıcılı Mod) Başlatılıyor...");
 
-      // A) Ham signer oluştur
-      const signer = await client.createSigner();
-      
-      // B) Managed Mode (İmzalı Kayıt)
-      if (process.env.FARCASTER_DEVELOPER_MNEMONIC && process.env.FARCASTER_DEVELOPER_FID) {
-        try {
-          console.log("🔐 İmza üretiliyor...");
-          const account = mnemonicToAccount(process.env.FARCASTER_DEVELOPER_MNEMONIC);
-          const appFid = parseInt(process.env.FARCASTER_DEVELOPER_FID);
-          const deadline = Math.floor(Date.now() / 1000) + 3600;
+// --- Kontroller ---
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+// Yazma yetkisi için Service Role Key şart
+const SUPABASE_ADMIN_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; 
+const NEYNAR_KEY = process.env.NEYNAR_API_KEY;
 
-          const SIGNED_KEY_REQUEST_VALIDATOR_EIP_712_DOMAIN = {
-            name: "Farcaster SignedKeyRequestValidator",
-            version: "1",
-            chainId: 10,
-            verifyingContract: "0x00000000fc700472606ed4fa22623acf62c60553",
-          };
+// Not: Artık NEYNAR_SIGNER_UUID'ye ihtiyacımız yok, çünkü veritabanından dinamik çekeceğiz.
 
-          const SIGNED_KEY_REQUEST_TYPE = [
-            { name: "requestFid", type: "uint256" },
-            { name: "key", type: "bytes" },
-            { name: "deadline", type: "uint256" },
-          ];
-
-          const signature = await account.signTypedData({
-            domain: SIGNED_KEY_REQUEST_VALIDATOR_EIP_712_DOMAIN,
-            types: { SignedKeyRequest: SIGNED_KEY_REQUEST_TYPE },
-            primaryType: "SignedKeyRequest",
-            message: {
-              requestFid: BigInt(appFid),
-              key: signer.public_key,
-              deadline: BigInt(deadline),
-            },
-          });
-
-          // DÜZELTME BURADA: Parametreleri NESNE ({...}) olarak gönderiyoruz
-          const registeredSigner = await client.registerSignedKey({
-            signerUuid: signer.signer_uuid,
-            appFid: appFid,
-            deadline: deadline,
-            signature: signature
-          });
-
-          console.log("🎉 Onay Linki alındı:", registeredSigner.signer_approval_url);
-          return res.status(200).json(registeredSigner);
-
-        } catch (signError) {
-          console.error("❌ İmzalama Hatası:", signError.message);
-          // Hata olsa bile ham signer dön (kullanıcıya hata göstermek yerine)
-          return res.status(200).json(signer);
-        }
-      } else {
-        console.warn("⚠️ Mnemonic eksik, onaysız signer dönülüyor.");
-        return res.status(200).json(signer);
-      }
-
-    } catch (error) {
-      console.error("Genel Hata:", error);
-      return res.status(500).json({ error: 'Failed to create signer' });
-    }
-  }
-
-  // --- DURUM KONTROLÜ (GET) ---
-  if (req.method === 'GET') {
-    const { signer_uuid } = req.query;
-    if (!signer_uuid) return res.status(400).json({ error: 'signer_uuid is required' });
-
-    try {
-      // DÜZELTME: Parametre nesne olarak gönderiliyor
-      const signer = await client.lookupSigner({ signerUuid: signer_uuid });
-      return res.status(200).json(signer);
-    } catch (error) {
-      return res.status(500).json({ error: 'Failed to fetch signer status' });
-    }
-  }
-
-  return res.status(405).json({ error: 'Method not allowed' });
+if (!SUPABASE_ADMIN_KEY) {
+    console.error("🚨 HATA: 'SUPABASE_SERVICE_ROLE_KEY' eksik! (.env dosyasını kontrol et)");
+    process.exit(1);
 }
+
+// --- Bağlantılar ---
+// Service Role Key ile Supabase Client oluştur (RLS bypass)
+const supabase = createClient(SUPABASE_URL, SUPABASE_ADMIN_KEY);
+const neynarClient = new NeynarAPIClient(new Configuration({ apiKey: NEYNAR_KEY }));
+const processingCache = new Set();
+
+async function checkAndPublish() {
+    const now = Date.now();
+    const timeString = new Date().toLocaleTimeString('tr-TR');
+
+    try {
+        // 1. Veritabanından "Zamanı Gelmiş" ve "Pending" olanları çek
+        const { data: posts, error } = await supabase
+            .from('posts')
+            .select('*')
+            .eq('status', 'pending')
+            .lte('scheduled_time', now);
+
+        if (error) {
+            console.error(`[${timeString}] ❌ DB Okuma Hatası:`, error.message);
+            return;
+        }
+
+        if (posts && posts.length > 0) {
+            console.log(`\n🚀 [${timeString}] ${posts.length} adet işlem bekleyen gönderi var.`);
+
+            for (const post of posts) {
+                // Çifte işlem koruması
+                if (processingCache.has(post.id)) continue;
+                processingCache.add(post.id);
+
+                console.log(`   🔍 İşleniyor: ID ${post.id} (Kullanıcı FID: ${post.user_fid})`);
+
+                try {
+                    // --- ADIM 1: KULLANICININ SIGNER ANAHTARINI BUL ---
+                    // Gönderiyi kim planladıysa onun yetki anahtarını çekiyoruz
+                    const { data: userProfile, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('signer_uuid')
+                        .eq('fid', post.user_fid)
+                        .single();
+
+                    if (profileError || !userProfile || !userProfile.signer_uuid) {
+                        console.error(`   ❌ HATA: Kullanıcının (FID: ${post.user_fid}) Signer anahtarı bulunamadı!`);
+                        // Anahtarı olmayan gönderiyi failed yap ki sürekli denemesin
+                        await supabase.from('posts').update({ status: 'failed' }).eq('id', post.id);
+                        processingCache.delete(post.id);
+                        continue; // Sonraki gönderiye geç
+                    }
+
+                    const userSignerUuid = userProfile.signer_uuid;
+                    // -------------------------------------------------
+
+                    let shouldPublish = true;
+
+                    // --- ADIM 2: AKILLI KONTROL (Farcaster'da var mı?) ---
+                    try {
+                        if (post.user_fid) {
+                            // Neynar API ile kullanıcının son gönderilerini kontrol et
+                            // Bu adım duplicate (tekrar) gönderimi engellemek için opsiyonel bir güvenlik katmanıdır.
+                            const feed = await neynarClient.fetchCastsForUser(post.user_fid, { limit: 10 });
+                            
+                            const alreadyPosted = feed.casts.some(cast => 
+                                cast.text.trim() === post.content.trim()
+                            );
+
+                            if (alreadyPosted) {
+                                console.log(`   ⚠️ BU GÖNDERİ ZATEN FARCASTER'DA VAR! (Tekrar gönderilmeyecek)`);
+                                shouldPublish = false;
+                            }
+                        }
+                    } catch (apiCheckError) {
+                        console.warn(`   ⚠️ Farcaster kontrolü yapılamadı, normal gönderim denenecek.`);
+                    }
+
+                    // --- ADIM 3: GÖNDERİM (Kullanıcının Anahtarıyla) ---
+                    if (shouldPublish) {
+                        await neynarClient.publishCast({
+                            signerUuid: userSignerUuid, // <--- KULLANICININ ONAYLANMIŞ ANAHTARI
+                            text: post.content,
+                        });
+                        console.log(`   ✅ Cast başarıyla gönderildi.`);
+                    }
+
+                    // --- ADIM 4: DURUM GÜNCELLEME ---
+                    const { error: updateError } = await supabase
+                        .from('posts')
+                        .update({ status: 'published' })
+                        .eq('id', post.id);
+
+                    if (updateError) {
+                        console.error(`   😱 DB Güncelleme Hatası:`, updateError.message);
+                    } else {
+                        console.log(`   ✅ Veritabanı 'published' olarak işaretlendi.`);
+                        processingCache.delete(post.id);
+                    }
+
+                } catch (err) {
+                    console.error(`   ❌ İşlem Hatası (ID: ${post.id}):`, err.message);
+                    await supabase.from('posts').update({ status: 'failed' }).eq('id', post.id);
+                    processingCache.delete(post.id);
+                }
+            }
+        }
+
+    } catch (err) {
+        console.error(`[${timeString}] Genel Hata:`, err.message);
+    }
+}
+
+// --- DÖNGÜ ---
+checkAndPublish();
+setInterval(checkAndPublish, 60 * 1000); // Her dakika kontrol et
