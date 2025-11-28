@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle, Bug } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle, RefreshCw } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -21,8 +21,8 @@ export default function ProfileSetupModal() {
   const [isLoadingSigner, setIsLoadingSigner] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   
-  // Hata Ayıklama için
-  const [debugData, setDebugData] = useState<any>(null);
+  // Hata Ayıklama
+  const [lastApiError, setLastApiError] = useState<string | null>(null);
 
   const saveProfile = useSaveCallerUserProfile();
 
@@ -57,48 +57,55 @@ export default function ProfileSetupModal() {
   // 1. Signer Oluşturma
   const createSigner = async () => {
     setIsLoadingSigner(true);
-    setDebugData(null); // Önceki hataları temizle
+    setLastApiError(null);
     try {
       const res = await fetch('/api/signer', { method: 'POST' });
       const data = await res.json();
       
-      console.log("🔥 API Yanıtı:", data); 
-      setDebugData(data); // Veriyi ekrana basmak için sakla
+      console.log("🔥 Create Signer Yanıtı:", data);
 
       if (data.signer_uuid) {
           setSignerUuid(data.signer_uuid);
           
-          // DÜZELTME: Olası tüm URL alanlarını kontrol et
+          // Linki kontrol et, varsa set et
           const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
+          if (url) setApprovalUrl(url);
+
+          // Link olmasa bile polling başlat (belki sonra gelir)
+          setIsPolling(true);
+          pollSignerStatus(data.signer_uuid);
           
-          if (url) {
-            setApprovalUrl(url);
-            setIsPolling(true);
-            pollSignerStatus(data.signer_uuid);
-          } else {
-            console.error("Link bulunamadı. Gelen veri:", data);
-            toast.error("Signer oluştu ancak onay linki bulunamadı. Aşağıdaki hata detayına bakın.");
-          }
       } else {
-          toast.error("Signer UUID alınamadı. API yanıtını kontrol edin.");
+          toast.error("Signer UUID alınamadı.");
+          setLastApiError(JSON.stringify(data));
       }
 
     } catch (e) {
       console.error("Failed to create signer:", e);
-      toast.error("Signer oluşturulamadı. Sunucu hatası olabilir.");
-      setDebugData({ error: e instanceof Error ? e.message : 'Bilinmeyen Hata' });
+      toast.error("Signer oluşturulamadı.");
     } finally {
       setIsLoadingSigner(false);
     }
   };
 
-  // 2. Durum Kontrolü (Polling)
+  // 2. Durum ve Link Kontrolü (Polling)
   const pollSignerStatus = async (uuid: string) => {
     const interval = setInterval(async () => {
       try {
+        // Durumu sorgula (GET)
         const res = await fetch(`/api/signer?signer_uuid=${uuid}`);
         const data = await res.json();
+        
+        // Eğer başta link gelmediyse, polling sırasında gelmiş mi diye bak
+        if (!approvalUrl) {
+            const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
+            if (url) {
+                console.log("✅ Onay linki sonradan bulundu:", url);
+                setApprovalUrl(url);
+            }
+        }
 
+        // Onaylanmış mı?
         if (data.status === 'approved') {
           setIsApproved(true);
           setIsPolling(false);
@@ -108,9 +115,9 @@ export default function ProfileSetupModal() {
       } catch (e) {
         console.error("Polling error:", e);
       }
-    }, 2000); 
+    }, 2000); // 2 saniyede bir kontrol et
     
-    // 3 dakika sonra polling'i durdur
+    // 3 dakika sonra durdur
     setTimeout(() => {
         clearInterval(interval);
         if (!isApproved) setIsPolling(false);
@@ -122,16 +129,15 @@ export default function ProfileSetupModal() {
       setApprovalUrl(null);
       setIsApproved(false);
       setIsPolling(false);
-      setDebugData(null);
+      setLastApiError(null);
   };
 
-  // 3. Linki Açma Fonksiyonu
+  // 3. Linki Açma
   const openApprovalLink = () => {
     if (!approvalUrl) {
-      toast.error("Onay linki yüklenemedi. Lütfen API yanıtını kontrol edin.");
+      toast.warning("Link bekleniyor, lütfen birkaç saniye bekleyin...");
       return;
     }
-
     try {
       sdk.actions.openUrl(approvalUrl);
     } catch (e) {
@@ -180,11 +186,9 @@ export default function ProfileSetupModal() {
               Farcaster Hesabını Bağla
             </Button>
             
-            {/* Hata varsa göster */}
-            {debugData && !debugData.signer_uuid && (
-                <div className="w-full rounded-md bg-destructive/10 p-2 text-xs text-destructive overflow-auto">
-                    <p className="font-bold flex items-center gap-1"><Bug className="h-3 w-3"/> API Hatası:</p>
-                    <pre className="mt-1">{JSON.stringify(debugData, null, 2)}</pre>
+            {lastApiError && (
+                <div className="text-xs text-red-500 bg-red-50 p-2 rounded w-full">
+                    Hata: {lastApiError}
                 </div>
             )}
           </div>
@@ -196,46 +200,42 @@ export default function ProfileSetupModal() {
                 <span className="text-sm font-medium">Onay Bekleniyor</span>
              </div>
              
-             {/* URL VARSA BUTONU GÖSTER, YOKSA HATA GÖSTER */}
-             {approvalUrl ? (
-                 <>
-                    <p className="text-center text-xs text-muted-foreground px-4">
-                    Aşağıdaki butona tıklayınca Warpcast açılacak. Lütfen açılan ekranda <strong>"Approve"</strong> butonuna basın.
-                    </p>
-                    <div className="w-full space-y-3">
-                        <Button 
-                            type="button"
-                            className="w-full py-6 text-base"
-                            onClick={openApprovalLink}
-                        >
-                            <ExternalLink className="mr-2 h-5 w-5" />
-                            Warpcast'i Aç ve Onayla
-                        </Button>
-                    </div>
-                 </>
-             ) : (
-                 <div className="w-full space-y-2">
-                    <div className="rounded-md bg-red-50 p-3 text-red-800 text-xs border border-red-200">
-                        <p className="font-bold mb-1">⚠️ HATA: Onay Linki Bulunamadı</p>
-                        <p>Signer oluşturuldu ancak API geçerli bir onay linki (URL) döndürmedi.</p>
-                        <p className="mt-2 font-semibold">API Yanıtı (Bunu geliştiriciye iletin):</p>
-                        <pre className="mt-1 bg-white p-2 rounded border overflow-x-auto max-h-32 text-[10px]">
-                            {JSON.stringify(debugData, null, 2)}
-                        </pre>
-                    </div>
-                 </div>
-             )}
+             <div className="text-center px-4 space-y-2">
+               <p className="text-xs text-muted-foreground">
+                 Aşağıdaki butona tıklayınca Warpcast açılacak. Lütfen açılan ekranda <strong>"Approve"</strong> butonuna basın.
+               </p>
+               
+               {/* Link yoksa bilgilendirme */}
+               {!approvalUrl && isPolling && (
+                   <p className="text-xs text-blue-500 flex items-center justify-center gap-1 animate-pulse">
+                       <RefreshCw className="h-3 w-3 animate-spin"/> Onay linki hazırlanıyor...
+                   </p>
+               )}
+             </div>
+             
+             <div className="w-full space-y-3">
+                {/* BUTON: Link varsa aktif, yoksa pasif */}
+                <Button 
+                    type="button"
+                    className="w-full py-6 text-base"
+                    onClick={openApprovalLink}
+                    disabled={!approvalUrl}
+                >
+                    <ExternalLink className="mr-2 h-5 w-5" />
+                    {approvalUrl ? "Warpcast'i Aç ve Onayla" : "Link Yükleniyor..."}
+                </Button>
                 
-             {!isPolling && approvalUrl && (
-                <div className="flex items-center justify-center gap-2 text-destructive text-xs">
-                    <AlertCircle className="h-3 w-3" /> 
-                    <span>Süre doldu. Lütfen "İptal Et" diyip tekrar deneyin.</span>
-                </div>
-             )}
+                {!isPolling && (
+                    <div className="flex items-center justify-center gap-2 text-destructive text-xs">
+                        <AlertCircle className="h-3 w-3" /> 
+                        <span>Süre doldu veya bağlantı koptu. Tekrar deneyin.</span>
+                    </div>
+                )}
 
-             <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-destructive">
-                İptal Et / Geri Dön
-             </Button>
+                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-destructive">
+                    İptal Et / Geri Dön
+                </Button>
+             </div>
            </div>
         ) : (
           // --- ADIM 3: TAMAMLA ---
