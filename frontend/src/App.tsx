@@ -19,7 +19,7 @@ export default function App() {
         if (farcasterUser) {
           setUser(farcasterUser);
         } else {
-          // Kullanıcı bulunamadıysa (Browser'da test ediliyorsa vb.)
+          // Kullanıcı bulunamadıysa (Bddddddddddddddrowser'da test ediliyorsa vb.)
           console.log("Not in Farcaster context or no user found.");
         }
       } catch (e) {
