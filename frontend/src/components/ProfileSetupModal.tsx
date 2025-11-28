@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -23,12 +23,10 @@ export default function ProfileSetupModal() {
 
   const saveProfile = useSaveCallerUserProfile();
 
-  // Mevcut profil varsa doldur
   useEffect(() => {
     if (userProfile) {
       setName(userProfile.name || '');
       setFarcasterHandle(userProfile.farcasterHandle || '');
-      // Eğer kullanıcının zaten kayıtlı bir signer'ı varsa durumu 'onaylandı' kabul et
       if (userProfile.signerUuid) {
         setSignerUuid(userProfile.signerUuid);
         setIsApproved(true);
@@ -36,8 +34,6 @@ export default function ProfileSetupModal() {
     }
   }, [userProfile]);
 
-  // Otomatik Kayıt Fonksiyonu
-  // Onay gelir gelmez veritabanına yazar, böylece UUID kaybolmaz.
   const handleAutoSave = (approvedUuid: string) => {
     const finalName = name.trim() || userProfile?.name || 'User';
     const finalHandle = farcasterHandle.trim() || userProfile?.farcasterHandle || 'user';
@@ -55,28 +51,25 @@ export default function ProfileSetupModal() {
     });
   };
 
-  // 1. Signer Oluşturma Fonksiyonu
+  // 1. Signer Oluşturma
   const createSigner = async () => {
     setIsLoadingSigner(true);
     try {
-      // Call our secure backend API
       const res = await fetch('/api/signer', { method: 'POST' });
       const data = await res.json();
       
-      setSignerUuid(data.signer_uuid);
-      setApprovalUrl(data.signer_approval_url);
-      
-      // Start polling for approval status
-      setIsPolling(true);
-      pollSignerStatus(data.signer_uuid);
-      
-      // Try to open URL directly if in Frame context
-      if (data.signer_approval_url) {
-         try {
-             sdk.actions.openUrl(data.signer_approval_url);
-         } catch (e) {
-             console.log("Frame openUrl failed, falling back to manual click.");
-         }
+      console.log("Signer API Yanıtı:", data); // Debug için log
+
+      if (data.signer_uuid) {
+          setSignerUuid(data.signer_uuid);
+          // API bazen signer_approval_url, bazen link, bazen url dönebilir. Hepsini kontrol et.
+          const url = data.signer_approval_url || data.link || data.url;
+          setApprovalUrl(url);
+          
+          setIsPolling(true);
+          pollSignerStatus(data.signer_uuid);
+      } else {
+          toast.error("Signer UUID alınamadı.");
       }
 
     } catch (e) {
@@ -87,35 +80,32 @@ export default function ProfileSetupModal() {
     }
   };
 
-  // 2. Poll for Signer Status
+  // 2. Durum Kontrolü (Polling)
   const pollSignerStatus = async (uuid: string) => {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/signer?signer_uuid=${uuid}`);
         const data = await res.json();
 
+        // Neynar status bazen "approved" bazen farklı dönebilir, "pending" değilse kontrol et
         if (data.status === 'approved') {
           setIsApproved(true);
           setIsPolling(false);
-          clearInterval(interval); // Stop polling
-          
-          // --- OTOMATİK KAYIT ---
-          // Onaylandığı an kaydet
+          clearInterval(interval);
           handleAutoSave(uuid);
         }
       } catch (e) {
         console.error("Polling error:", e);
       }
-    }, 2000); // Check every 2 seconds
+    }, 2000); 
     
-    // 2 dakika sonra polling'i durdur (Timeout)
+    // 3 dakika sonra polling'i durdur
     setTimeout(() => {
         clearInterval(interval);
-        setIsPolling(false);
-    }, 120000);
+        if (!isApproved) setIsPolling(false);
+    }, 180000);
   };
 
-  // Bağlantıyı Kesme (Reset)
   const handleDisconnect = () => {
       setSignerUuid(null);
       setApprovalUrl(null);
@@ -123,27 +113,44 @@ export default function ProfileSetupModal() {
       setIsPolling(false);
   };
 
-  // 3. Handle Form Submit (Manual Save)
+  // --- KRİTİK DÜZELTME: Buton Tıklama İşleyicisi ---
+  const handleOpenApprovalUrl = () => {
+      if (!approvalUrl) {
+          toast.error("Onay linki bulunamadı.");
+          return;
+      }
+
+      console.log("Link açılıyor:", approvalUrl);
+
+      try {
+          // Önce SDK metodunu dene
+          sdk.actions.openUrl(approvalUrl);
+      } catch (err) {
+          console.error("SDK openUrl hatası, fallback deneniyor:", err);
+          // SDK çalışmazsa standart tarayıcı metodunu dene
+          window.open(approvalUrl, '_blank');
+      }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !farcasterHandle.trim()) return;
     
     if (!signerUuid || !isApproved) {
-        alert("Lütfen önce Farcaster hesabınızı bağlayın.");
+        toast.warning("Lütfen önce Farcaster hesabınızı bağlayın.");
         return;
     }
 
-    // Save profile with the new signer_uuid
     saveProfile.mutate({
       name: name.trim(),
       farcasterHandle: farcasterHandle.trim().replace('@', ''),
       isPremium: false,
       createdAt: Date.now(),
-      signerUuid: signerUuid // Passing the approved signer UUID
+      signerUuid: signerUuid
     });
   };
   
-  if (isProfileLoading) return null; // Yüklenirken boş göster
+  if (isProfileLoading) return null;
 
   return (
     <Dialog open={true}>
@@ -156,7 +163,7 @@ export default function ProfileSetupModal() {
         </DialogHeader>
 
         {!signerUuid ? (
-          // --- STEP 1: CONNECT ACCOUNT ---
+          // --- STEP 1: BAĞLAN ---
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="text-center">
                <p className="mb-2 text-sm text-muted-foreground">Paylaşım yapabilmemiz için Farcaster hesabını bağlamalısın.</p>
@@ -167,43 +174,46 @@ export default function ProfileSetupModal() {
             </Button>
           </div>
         ) : !isApproved ? (
-           // --- STEP 2: AWAIT APPROVAL ---
+           // --- STEP 2: ONAY BEKLE ---
            <div className="flex flex-col items-center gap-4 py-4">
-             <p className="text-sm font-medium text-yellow-600">Onay Bekleniyor...</p>
-             <p className="text-center text-xs text-muted-foreground">
-               Lütfen aşağıdaki butona tıkla ve Warpcast'te açılan pencerede "Approve" de.
+             <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm font-medium">Onay Bekleniyor</span>
+             </div>
+             
+             <p className="text-center text-xs text-muted-foreground px-4">
+               Aşağıdaki butona tıklayınca Warpcast açılacak. Lütfen açılan ekranda <strong>"Approve"</strong> butonuna basın.
              </p>
              
-             <div className="w-full space-y-2">
+             <div className="w-full space-y-3">
+                {/* DÜZELTİLMİŞ BUTON */}
                 <Button 
                     type="button"
-                    className="w-full"
-                    onClick={() => {
-                        if (approvalUrl) {
-                            sdk.actions.openUrl(approvalUrl);
-                        }
-                    }}
+                    className="w-full py-6 text-base"
+                    onClick={handleOpenApprovalUrl}
                 >
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Onaylamak için Tıkla (Warpcast Açılır)
+                    <ExternalLink className="mr-2 h-5 w-5" />
+                    Warpcast'i Aç ve Onayla
                 </Button>
                 
-                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
+                {!isPolling && (
+                    <div className="flex items-center justify-center gap-2 text-destructive text-xs">
+                        <AlertCircle className="h-3 w-3" /> 
+                        <span>Süre doldu. Lütfen "İptal Et" diyip tekrar deneyin.</span>
+                    </div>
+                )}
+
+                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-destructive">
                     İptal Et / Geri Dön
                 </Button>
              </div>
-
-             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-               {isPolling ? <Loader2 className="h-3 w-3 animate-spin" /> : null} 
-               {isPolling ? "Durum kontrol ediliyor..." : "Zaman aşımı. Tekrar deneyin."}
-             </div>
            </div>
         ) : (
-          // --- STEP 3: FINALIZE PROFILE ---
+          // --- STEP 3: TAMAMLA ---
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                    <CheckCircle2 className="h-4 w-4" /> Hesap Bağlandı
+                    <CheckCircle2 className="h-4 w-4" /> Hesap Başarıyla Bağlandı
                 </div>
                 <Button 
                     type="button" 
@@ -238,7 +248,7 @@ export default function ProfileSetupModal() {
             </div>
             <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
               {saveProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Kaydı Güncelle / Tamamla
+              Kaydı Tamamla
             </Button>
           </form>
         )}
