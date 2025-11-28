@@ -16,9 +16,10 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": false, // Hataları azaltmak için false yaptık
+    "noUnusedParameters": false, // Hataları azaltmak için false yaptık
     "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
     
     /* Paths & Base */
     "baseUrl": ".",
@@ -28,5 +29,6 @@
     "types": ["vite/client", "node"]
   },
   "include": ["src"],
+  "exclude": ["node_modules", "api"], // api klasörünü build'den koruyoruz
   "references": [{ "path": "./tsconfig.node.json" }]
 }
