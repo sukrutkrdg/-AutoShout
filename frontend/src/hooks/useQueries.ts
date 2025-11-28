@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 async function getCurrentFid(): Promise<number> {
     const context = await sdk.context;
     
-    // Dev modunda tarayıcıda test ederken hata almamak için sahte ID
+    // Dev modunda tarayıcıda test ederken haata almamak için sahte ID (Sadece development için)
     if ((!context || !context.user) && import.meta.env.DEV) return 1; 
     
     if (!context || !context.user) throw new Error("User session not found");
@@ -84,6 +84,32 @@ export function useSaveCallerUserProfile() {
     },
     onError: (error: Error) => {
       toast.error('Error: ' + error.message);
+    },
+  });
+}
+
+// --- BAĞLANTIYI KESME (ÇIKIŞ) FONKSİYONU ---
+export function useDisconnectUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const fid = await getCurrentFid();
+      // Veritabanındaki signer_uuid alanını temizle
+      const { error } = await supabase
+        .from('profiles')
+        .update({ signer_uuid: null, signer_status: null })
+        .eq('fid', fid);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      toast.success('Disconnected successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Logout error:', error);
+      // Hata olsa bile kullanıcı arayüzden çıkabilsin diye hata basmıyoruz
     },
   });
 }

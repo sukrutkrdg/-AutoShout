@@ -7,6 +7,7 @@ import { Clock, CheckCircle2, XCircle, Plus, Zap } from 'lucide-react';
 import PostScheduler from '../components/PostScheduler';
 import PostsList from '../components/PostsList';
 import CalendarView from '../components/CalendarView';
+import ProfileSetupModal from '../components/ProfileSetupModal'; // Giriş ekranı eklendi
 import { FarcasterUser } from '../lib/farcaster';
 
 interface DashboardProps {
@@ -14,21 +15,28 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user }: DashboardProps) {
-  const { data: userProfile } = useGetCallerUserProfile();
+  const { data: userProfile, isLoading: isProfileLoading } = useGetCallerUserProfile();
   const { data: posts = [] } = useGetUserScheduledPosts();
   const { data: remainingPosts } = useGetRemainingWeeklyPosts();
   const [showScheduler, setShowScheduler] = useState(false);
+
+  // --- KRİTİK EKLEME: Kullanıcı bağlı değilse Modalı göster ---
+  const showSetupModal = !isProfileLoading && (!userProfile || !userProfile.signerUuid);
 
   const pendingPosts = posts.filter(p => p.status === 'pending');
   const publishedPosts = posts.filter(p => p.status === 'published');
   const failedPosts = posts.filter(p => p.status === 'failed');
 
   const weeklyLimit = userProfile?.isPremium ? 100 : 10;
-  // remainingPosts undefined gelirse 0 kabul et
+  // Sayısal dönüşüm hatasını önlemek için güvenli çeviri
   const usedPosts = weeklyLimit - Number(remainingPosts || 0);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      
+      {/* Eğer yetki yoksa bu ekran açılır */}
+      {showSetupModal && <ProfileSetupModal />}
+
       <div className="mb-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
