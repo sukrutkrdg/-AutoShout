@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useSaveCallerUserProfile } from '../hooks/useQueries';
+import { useSaveCallerUserProfile, useGetCallerUserProfile } from '../hooks/useQueries';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 
 export default function ProfileSetupModal() {
+  const { data: userProfile, isLoading: isProfileLoading } = useGetCallerUserProfile();
+  
   const [name, setName] = useState('');
   const [farcasterHandle, setFarcasterHandle] = useState('');
   
@@ -16,10 +18,24 @@ export default function ProfileSetupModal() {
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isLoadingSigner, setIsLoadingSigner] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
 
   const saveProfile = useSaveCallerUserProfile();
 
-  // 1. Create Signer Function
+  // Mevcut profil varsa doldur
+  useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.name || '');
+      setFarcasterHandle(userProfile.farcasterHandle || '');
+      // Eğer kullanıcının zaten kayıtlı bir signer'ı varsa durumu 'onaylandı' kabul et
+      if (userProfile.signerUuid) {
+        setSignerUuid(userProfile.signerUuid);
+        setIsApproved(true);
+      }
+    }
+  }, [userProfile]);
+
+  // 1. Signer Oluşturma Fonksiyonu
   const createSigner = async () => {
     setIsLoadingSigner(true);
     try {
@@ -31,6 +47,7 @@ export default function ProfileSetupModal() {
       setApprovalUrl(data.signer_approval_url);
       
       // Start polling for approval status
+      setIsPolling(true);
       pollSignerStatus(data.signer_uuid);
       
       // Try to open URL directly if in Frame context
@@ -58,12 +75,29 @@ export default function ProfileSetupModal() {
 
         if (data.status === 'approved') {
           setIsApproved(true);
+          setIsPolling(false);
           clearInterval(interval); // Stop polling
         }
       } catch (e) {
         console.error("Polling error:", e);
       }
     }, 2000); // Check every 2 seconds
+    
+    // 2 dakika sonra polling'i durdur (Timeout)
+    setTimeout(() => {
+        clearInterval(interval);
+        setIsPolling(false);
+    }, 120000);
+  };
+
+  // Bağlantıyı Kesme (Reset)
+  const handleDisconnect = () => {
+      setSignerUuid(null);
+      setApprovalUrl(null);
+      setIsApproved(false);
+      setIsPolling(false);
+      // İstersen burada veritabanından da signer_uuid'yi silebilirsin,
+      // ama şimdilik sadece frontend state'ini sıfırlıyoruz.
   };
 
   // 3. Handle Form Submit
@@ -72,7 +106,7 @@ export default function ProfileSetupModal() {
     if (!name.trim() || !farcasterHandle.trim()) return;
     
     if (!signerUuid || !isApproved) {
-        alert("Please connect your Farcaster account first.");
+        alert("Lütfen önce Farcaster hesabınızı bağlayın.");
         return;
     }
 
@@ -85,14 +119,20 @@ export default function ProfileSetupModal() {
       signerUuid: signerUuid // Passing the approved signer UUID
     });
   };
+  
+  if (isProfileLoading) return null; // Yüklenirken boş göster
+
+  // Eğer zaten kayıtlıysa ve signer'ı varsa modalı gösterme (veya sadece düzenleme modu açılabilir)
+  // Ancak "ilk kurulum" mantığı olduğu için şimdilik her zaman açık bırakıyoruz.
+  // Kullanıcı UX'ini iyileştirmek için istersen buraya `if (userProfile?.signerUuid) return null;` ekleyebilirsin.
 
   return (
     <Dialog open={true}>
       <DialogContent className="sm:max-w-md" onPointerDownOutside={(e: any) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Welcome! 👋</DialogTitle>
+          <DialogTitle>Hoşgeldin! 👋</DialogTitle>
           <DialogDescription>
-            Please create your profile and connect your Farcaster account to start using AutoShout.
+            AutoShout'u kullanmak için profilini oluştur ve yetki ver.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,55 +140,72 @@ export default function ProfileSetupModal() {
           // --- STEP 1: CONNECT ACCOUNT ---
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="text-center">
-               <p className="mb-2 text-sm text-muted-foreground">You need to delegate write access to schedule posts.</p>
+               <p className="mb-2 text-sm text-muted-foreground">Paylaşım yapabilmemiz için Farcaster hesabını bağlamalısın.</p>
             </div>
             <Button onClick={createSigner} disabled={isLoadingSigner} className="w-full" variant="outline">
               {isLoadingSigner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
-              Connect Farcaster Account
+              Farcaster Hesabını Bağla
             </Button>
           </div>
         ) : !isApproved ? (
            // --- STEP 2: AWAIT APPROVAL ---
            <div className="flex flex-col items-center gap-4 py-4">
-             <p className="text-sm font-medium text-yellow-600">Waiting for Approval...</p>
+             <p className="text-sm font-medium text-yellow-600">Onay Bekleniyor...</p>
              <p className="text-center text-xs text-muted-foreground">
-               Please click the button below and approve the signer in Warpcast.
+               Lütfen aşağıdaki butona tıkla ve Warpcast'te açılan pencerede "Approve" de.
              </p>
              
-             <div className="rounded-lg border p-4 w-full">
+             <div className="w-full space-y-2">
                 <Button asChild className="w-full">
                     <a href={approvalUrl!} target="_blank" rel="noreferrer">
                         <ExternalLink className="mr-2 h-4 w-4" />
-                        Click to Approve
+                        Onaylamak için Tıkla
                     </a>
                 </Button>
+                
+                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
+                    İptal Et / Geri Dön
+                </Button>
              </div>
+
              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-               <Loader2 className="h-3 w-3 animate-spin" /> Checking status...
+               {isPolling ? <Loader2 className="h-3 w-3 animate-spin" /> : null} 
+               {isPolling ? "Durum kontrol ediliyor..." : "Zaman aşımı. Tekrar deneyin."}
              </div>
            </div>
         ) : (
           // --- STEP 3: FINALIZE PROFILE ---
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                <CheckCircle2 className="h-4 w-4" /> Account Connected!
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    <CheckCircle2 className="h-4 w-4" /> Hesap Bağlandı
+                </div>
+                <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleDisconnect}
+                    className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                >
+                    <LogOut className="mr-1 h-3 w-3" /> Farklı hesap bağla
+                </Button>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">Display Name</Label>
+              <Label htmlFor="name">Görünen Adın</Label>
               <Input
                 id="name"
-                placeholder="e.g. Alice"
+                placeholder="Örn: Şükrü"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="farcaster">Farcaster Username</Label>
+              <Label htmlFor="farcaster">Kullanıcı Adın</Label>
               <Input
                 id="farcaster"
-                placeholder="alice"
+                placeholder="sukru"
                 value={farcasterHandle}
                 onChange={(e) => setFarcasterHandle(e.target.value)}
                 required
@@ -156,7 +213,7 @@ export default function ProfileSetupModal() {
             </div>
             <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
               {saveProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Complete Setup
+              Kaydı Tamamla
             </Button>
           </form>
         )}
