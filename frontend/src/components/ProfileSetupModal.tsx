@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, Copy, RefreshCw } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -20,9 +20,6 @@ export default function ProfileSetupModal() {
   const [isApproved, setIsApproved] = useState(false);
   const [isLoadingSigner, setIsLoadingSigner] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
-  
-  // Hata Ayıklama
-  const [lastApiError, setLastApiError] = useState<string | null>(null);
 
   const saveProfile = useSaveCallerUserProfile();
 
@@ -54,70 +51,54 @@ export default function ProfileSetupModal() {
     });
   };
 
-  // 1. Signer Oluşturma
   const createSigner = async () => {
     setIsLoadingSigner(true);
-    setLastApiError(null);
     try {
       const res = await fetch('/api/signer', { method: 'POST' });
       const data = await res.json();
       
-      console.log("🔥 Create Signer Yanıtı:", data);
+      console.log("🔥 API Yanıtı:", data);
 
       if (data.signer_uuid) {
           setSignerUuid(data.signer_uuid);
           
-          // Linki kontrol et, varsa set et
           const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
           if (url) setApprovalUrl(url);
 
-          // Link olmasa bile polling başlat (belki sonra gelir)
           setIsPolling(true);
           pollSignerStatus(data.signer_uuid);
-          
       } else {
           toast.error("Signer UUID alınamadı.");
-          setLastApiError(JSON.stringify(data));
       }
-
     } catch (e) {
-      console.error("Failed to create signer:", e);
-      toast.error("Signer oluşturulamadı.");
+      console.error("Hata:", e);
+      toast.error("İşlem başarısız.");
     } finally {
       setIsLoadingSigner(false);
     }
   };
 
-  // 2. Durum ve Link Kontrolü (Polling)
   const pollSignerStatus = async (uuid: string) => {
     const interval = setInterval(async () => {
       try {
-        // Durumu sorgula (GET)
         const res = await fetch(`/api/signer?signer_uuid=${uuid}`);
         const data = await res.json();
         
-        // Eğer başta link gelmediyse, polling sırasında gelmiş mi diye bak
+        // Link sonradan gelirse yakala
         if (!approvalUrl) {
-            const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
-            if (url) {
-                console.log("✅ Onay linki sonradan bulundu:", url);
-                setApprovalUrl(url);
-            }
+            const url = data.signer_approval_url || data.link || data.url;
+            if (url) setApprovalUrl(url);
         }
 
-        // Onaylanmış mı?
         if (data.status === 'approved') {
           setIsApproved(true);
           setIsPolling(false);
           clearInterval(interval);
           handleAutoSave(uuid);
         }
-      } catch (e) {
-        console.error("Polling error:", e);
-      }
-    }, 2000); // 2 saniyede bir kontrol et
+      } catch (e) { console.error(e); }
+    }, 2000); 
     
-    // 3 dakika sonra durdur
     setTimeout(() => {
         clearInterval(interval);
         if (!isApproved) setIsPolling(false);
@@ -129,20 +110,27 @@ export default function ProfileSetupModal() {
       setApprovalUrl(null);
       setIsApproved(false);
       setIsPolling(false);
-      setLastApiError(null);
   };
 
-  // 3. Linki Açma
+  // 3. Güvenli Link Açma
   const openApprovalLink = () => {
-    if (!approvalUrl) {
-      toast.warning("Link bekleniyor, lütfen birkaç saniye bekleyin...");
-      return;
-    }
+    if (!approvalUrl) return;
+
+    // Eğer link warpcast:// ise ve mobildeysek, sdk.actions ile açmayı dene
+    // Değilse yeni sekmede aç
     try {
       sdk.actions.openUrl(approvalUrl);
     } catch (e) {
+      console.log("SDK openUrl fail, fallback to window.open");
       window.open(approvalUrl, '_blank');
     }
+  };
+
+  const copyLink = () => {
+      if (approvalUrl) {
+          navigator.clipboard.writeText(approvalUrl);
+          toast.success("Link kopyalandı! Tarayıcıda açabilirsiniz.");
+      }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -176,108 +164,64 @@ export default function ProfileSetupModal() {
         </DialogHeader>
 
         {!signerUuid ? (
-          // --- ADIM 1: BAĞLAN ---
           <div className="flex flex-col items-center gap-4 py-4">
-            <div className="text-center">
-               <p className="mb-2 text-sm text-muted-foreground">Paylaşım yapabilmemiz için Farcaster hesabını bağlamalısın.</p>
-            </div>
             <Button onClick={createSigner} disabled={isLoadingSigner} className="w-full" variant="outline">
               {isLoadingSigner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
               Farcaster Hesabını Bağla
             </Button>
-            
-            {lastApiError && (
-                <div className="text-xs text-red-500 bg-red-50 p-2 rounded w-full">
-                    Hata: {lastApiError}
-                </div>
-            )}
           </div>
         ) : !isApproved ? (
-           // --- ADIM 2: ONAY BEKLE ---
            <div className="flex flex-col items-center gap-4 py-4">
              <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span className="text-sm font-medium">Onay Bekleniyor</span>
              </div>
              
-             <div className="text-center px-4 space-y-2">
-               <p className="text-xs text-muted-foreground">
-                 Aşağıdaki butona tıklayınca Warpcast açılacak. Lütfen açılan ekranda <strong>"Approve"</strong> butonuna basın.
-               </p>
-               
-               {/* Link yoksa bilgilendirme */}
-               {!approvalUrl && isPolling && (
-                   <p className="text-xs text-blue-500 flex items-center justify-center gap-1 animate-pulse">
-                       <RefreshCw className="h-3 w-3 animate-spin"/> Onay linki hazırlanıyor...
-                   </p>
-               )}
-             </div>
-             
-             <div className="w-full space-y-3">
-                {/* BUTON: Link varsa aktif, yoksa pasif */}
-                <Button 
-                    type="button"
-                    className="w-full py-6 text-base"
-                    onClick={openApprovalLink}
-                    disabled={!approvalUrl}
-                >
-                    <ExternalLink className="mr-2 h-5 w-5" />
-                    {approvalUrl ? "Warpcast'i Aç ve Onayla" : "Link Yükleniyor..."}
-                </Button>
-                
-                {!isPolling && (
-                    <div className="flex items-center justify-center gap-2 text-destructive text-xs">
-                        <AlertCircle className="h-3 w-3" /> 
-                        <span>Süre doldu veya bağlantı koptu. Tekrar deneyin.</span>
+             {/* --- LİNK GÖSTERİM ALANI (DEBUG İÇİN) --- */}
+             {approvalUrl ? (
+                 <div className="w-full space-y-3">
+                    <div className="p-2 bg-muted rounded text-[10px] break-all font-mono text-muted-foreground border">
+                        {approvalUrl}
                     </div>
-                )}
 
-                <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-destructive">
-                    İptal Et / Geri Dön
-                </Button>
-             </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button onClick={openApprovalLink} className="w-full">
+                            <ExternalLink className="mr-2 h-4 w-4" /> Aç
+                        </Button>
+                        <Button variant="outline" onClick={copyLink} className="w-full">
+                            <Copy className="mr-2 h-4 w-4" /> Kopyala
+                        </Button>
+                    </div>
+                    <p className="text-xs text-center text-muted-foreground">
+                        Eğer buton açmıyorsa, linki kopyalayıp tarayıcıda yapıştırın.
+                    </p>
+                 </div>
+             ) : (
+                 <div className="text-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                    <p className="text-xs mt-2 text-muted-foreground">Onay linki oluşturuluyor...</p>
+                 </div>
+             )}
+
+             <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive">
+                İptal
+             </Button>
            </div>
         ) : (
-          // --- ADIM 3: TAMAMLA ---
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                    <CheckCircle2 className="h-4 w-4" /> Hesap Başarıyla Bağlandı
-                </div>
-                <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={handleDisconnect}
-                    className="h-6 text-xs text-muted-foreground hover:text-destructive"
-                >
-                    <LogOut className="mr-1 h-3 w-3" /> Farklı hesap bağla
-                </Button>
+            <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700">
+                <CheckCircle2 className="h-4 w-4" /> Hesap Başarıyla Bağlandı
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="name">Görünen Adın</Label>
-              <Input
-                id="name"
-                placeholder="Örn: Şükrü"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="farcaster">Kullanıcı Adın</Label>
-              <Input
-                id="farcaster"
-                placeholder="sukru"
-                value={farcasterHandle}
-                onChange={(e) => setFarcasterHandle(e.target.value)}
-                required
-              />
+              <Input id="farcaster" value={farcasterHandle} onChange={(e) => setFarcasterHandle(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
-              {saveProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Kaydı Tamamla
+              {saveProfile.isPending ? "Kaydediliyor..." : "Kaydı Tamamla"}
             </Button>
           </form>
         )}
