@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, Copy, RefreshCw } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, AlertCircle, Copy } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 
@@ -14,7 +14,6 @@ export default function ProfileSetupModal() {
   const [name, setName] = useState('');
   const [farcasterHandle, setFarcasterHandle] = useState('');
   
-  // Signer States
   const [signerUuid, setSignerUuid] = useState<string | null>(null);
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
@@ -84,7 +83,6 @@ export default function ProfileSetupModal() {
         const res = await fetch(`/api/signer?signer_uuid=${uuid}`);
         const data = await res.json();
         
-        // Link sonradan gelirse yakala
         if (!approvalUrl) {
             const url = data.signer_approval_url || data.link || data.url;
             if (url) setApprovalUrl(url);
@@ -112,16 +110,11 @@ export default function ProfileSetupModal() {
       setIsPolling(false);
   };
 
-  // 3. Güvenli Link Açma
   const openApprovalLink = () => {
     if (!approvalUrl) return;
-
-    // Eğer link warpcast:// ise ve mobildeysek, sdk.actions ile açmayı dene
-    // Değilse yeni sekmede aç
     try {
       sdk.actions.openUrl(approvalUrl);
     } catch (e) {
-      console.log("SDK openUrl fail, fallback to window.open");
       window.open(approvalUrl, '_blank');
     }
   };
@@ -129,19 +122,17 @@ export default function ProfileSetupModal() {
   const copyLink = () => {
       if (approvalUrl) {
           navigator.clipboard.writeText(approvalUrl);
-          toast.success("Link kopyalandı! Tarayıcıda açabilirsiniz.");
+          toast.success("Link kopyalandı!");
       }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !farcasterHandle.trim()) return;
-    
     if (!signerUuid || !isApproved) {
         toast.warning("Lütfen önce Farcaster hesabınızı bağlayın.");
         return;
     }
-
     saveProfile.mutate({
       name: name.trim(),
       farcasterHandle: farcasterHandle.trim().replace('@', ''),
@@ -158,9 +149,7 @@ export default function ProfileSetupModal() {
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e: any) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Hoşgeldin! 👋</DialogTitle>
-          <DialogDescription>
-            AutoShout'u kullanmak için profilini oluştur ve yetki ver.
-          </DialogDescription>
+          <DialogDescription>AutoShout'u kullanmak için profilini oluştur.</DialogDescription>
         </DialogHeader>
 
         {!signerUuid ? (
@@ -171,30 +160,33 @@ export default function ProfileSetupModal() {
             </Button>
           </div>
         ) : !isApproved ? (
-           <div className="flex flex-col items-center gap-4 py-4">
-             <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm font-medium">Onay Bekleniyor</span>
+           <div className="flex flex-col items-center gap-4 py-2">
+             <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm font-medium">
+                <Loader2 className="h-4 w-4 animate-spin" /> Onay Bekleniyor
              </div>
              
-             {/* --- LİNK GÖSTERİM ALANI (DEBUG İÇİN) --- */}
              {approvalUrl ? (
-                 <div className="w-full space-y-3">
-                    <div className="p-2 bg-muted rounded text-[10px] break-all font-mono text-muted-foreground border">
-                        {approvalUrl}
+                 <div className="w-full flex flex-col items-center gap-4">
+                    {/* QR KOD ALANI */}
+                    <div className="bg-white p-2 rounded-lg border shadow-sm">
+                        <img 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(approvalUrl)}`} 
+                            alt="Scan to Approve" 
+                            className="w-40 h-40"
+                        />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button onClick={openApprovalLink} className="w-full">
-                            <ExternalLink className="mr-2 h-4 w-4" /> Aç
-                        </Button>
-                        <Button variant="outline" onClick={copyLink} className="w-full">
-                            <Copy className="mr-2 h-4 w-4" /> Kopyala
-                        </Button>
-                    </div>
-                    <p className="text-xs text-center text-muted-foreground">
-                        Eğer buton açmıyorsa, linki kopyalayıp tarayıcıda yapıştırın.
+                    <p className="text-center text-xs text-muted-foreground">
+                        Telefon kameranızla bu kodu okutun<br/>veya linki kopyalayıp mobilde açın.
                     </p>
+
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                        <Button variant="outline" onClick={copyLink} className="w-full">
+                            <Copy className="mr-2 h-4 w-4" /> Linki Kopyala
+                        </Button>
+                        <Button onClick={openApprovalLink} className="w-full">
+                            <ExternalLink className="mr-2 h-4 w-4" /> Mobilde Aç
+                        </Button>
+                    </div>
                  </div>
              ) : (
                  <div className="text-center py-4">
@@ -203,8 +195,8 @@ export default function ProfileSetupModal() {
                  </div>
              )}
 
-             <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive">
-                İptal
+             <Button onClick={handleDisconnect} variant="ghost" size="sm" className="w-full text-destructive mt-2">
+                İptal Et
              </Button>
            </div>
         ) : (
