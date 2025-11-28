@@ -40,8 +40,11 @@ export function useGetCallerUserProfile() {
             name: data.display_name,       // DB: display_name -> App: name
             farcasterHandle: data.username,// DB: username -> App: farcasterHandle
             isPremium: data.is_premium,    // DB: is_premium -> App: isPremium
-            createdAt: new Date(data.created_at).getTime()
-        } as UserProfile;
+            createdAt: new Date(data.created_at).getTime(),
+            // Eğer signer_uuid varsa onu da dönüyoruz (opsiyonel)
+            // Bu alana UserProfile interface'inde ihtiyacın olabilir
+            signerUuid: data.signer_uuid 
+        } as UserProfile & { signerUuid?: string };
       }
       
       return null;
@@ -53,8 +56,9 @@ export function useGetCallerUserProfile() {
 export function useSaveCallerUserProfile() {
   const queryClient = useQueryClient();
 
+  // Parametre tipi: UserProfile & { signerUuid?: string } olarak genişletildi
   return useMutation({
-    mutationFn: async (profile: UserProfile) => {
+    mutationFn: async (profile: UserProfile & { signerUuid?: string }) => {
       const fid = await getCurrentFid();
       
       // Yazarken de tam tersi eşleştirme yapıyoruz
@@ -65,6 +69,11 @@ export function useSaveCallerUserProfile() {
             username: profile.farcasterHandle, // App -> DB
             display_name: profile.name,        // App -> DB
             is_premium: profile.isPremium,
+            // YENİ EKLENEN: Signer UUID varsa kaydet
+            ...(profile.signerUuid && { 
+                signer_uuid: profile.signerUuid,
+                signer_status: 'approved' 
+            })
         });
         
       if (error) throw error;
@@ -119,6 +128,9 @@ export function useCreateScheduledPost() {
       // Profil kontrolü
       const { data: profile } = await supabase.from('profiles').select('fid').eq('fid', fid).single();
       if (!profile) {
+          // Eğer profil yoksa varsayılan bir profil oluşturuyoruz.
+          // NOT: Bu durumda signer_uuid olmayacağı için bot bu postu atamaz.
+          // Kullanıcıyı profil oluşturmaya zorlamak daha iyi bir UX olabilir.
           await supabase.from('profiles').insert({ fid, username: 'user', display_name: 'User' });
       }
 
