@@ -58,16 +58,22 @@ export default function ProfileSetupModal() {
       const res = await fetch('/api/signer', { method: 'POST' });
       const data = await res.json();
       
-      console.log("Signer API Yanıtı:", data); // Debug için log
+      console.log("🔥 API Yanıtı:", data); // Konsola yanıtı yazdıralım
 
       if (data.signer_uuid) {
           setSignerUuid(data.signer_uuid);
-          // API bazen signer_approval_url, bazen link, bazen url dönebilir. Hepsini kontrol et.
-          const url = data.signer_approval_url || data.link || data.url;
-          setApprovalUrl(url);
           
-          setIsPolling(true);
-          pollSignerStatus(data.signer_uuid);
+          // DÜZELTME: API'den gelen farklı URL isimlerini kontrol et
+          const url = data.signer_approval_url || data.link || data.url;
+          
+          if (url) {
+            setApprovalUrl(url);
+            setIsPolling(true);
+            pollSignerStatus(data.signer_uuid);
+          } else {
+            console.error("Link bulunamadı:", data);
+            toast.error("Signer oluştu ancak link alınamadı.");
+          }
       } else {
           toast.error("Signer UUID alınamadı.");
       }
@@ -87,7 +93,6 @@ export default function ProfileSetupModal() {
         const res = await fetch(`/api/signer?signer_uuid=${uuid}`);
         const data = await res.json();
 
-        // Neynar status bazen "approved" bazen farklı dönebilir, "pending" değilse kontrol et
         if (data.status === 'approved') {
           setIsApproved(true);
           setIsPolling(false);
@@ -113,23 +118,20 @@ export default function ProfileSetupModal() {
       setIsPolling(false);
   };
 
-  // --- KRİTİK DÜZELTME: Buton Tıklama İşleyicisi ---
-  const handleOpenApprovalUrl = () => {
-      if (!approvalUrl) {
-          toast.error("Onay linki bulunamadı.");
-          return;
-      }
+  // 3. Linki Açma Fonksiyonu
+  const openApprovalLink = () => {
+    if (!approvalUrl) {
+      toast.error("Onay linki henüz yüklenmedi.");
+      return;
+    }
 
-      console.log("Link açılıyor:", approvalUrl);
-
-      try {
-          // Önce SDK metodunu dene
-          sdk.actions.openUrl(approvalUrl);
-      } catch (err) {
-          console.error("SDK openUrl hatası, fallback deneniyor:", err);
-          // SDK çalışmazsa standart tarayıcı metodunu dene
-          window.open(approvalUrl, '_blank');
-      }
+    try {
+      // Önce Farcaster SDK ile açmayı dene
+      sdk.actions.openUrl(approvalUrl);
+    } catch (e) {
+      // Olmazsa standart pencere aç
+      window.open(approvalUrl, '_blank');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -163,7 +165,7 @@ export default function ProfileSetupModal() {
         </DialogHeader>
 
         {!signerUuid ? (
-          // --- STEP 1: BAĞLAN ---
+          // --- ADIM 1: BAĞLAN ---
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="text-center">
                <p className="mb-2 text-sm text-muted-foreground">Paylaşım yapabilmemiz için Farcaster hesabını bağlamalısın.</p>
@@ -174,7 +176,7 @@ export default function ProfileSetupModal() {
             </Button>
           </div>
         ) : !isApproved ? (
-           // --- STEP 2: ONAY BEKLE ---
+           // --- ADIM 2: ONAY BEKLE ---
            <div className="flex flex-col items-center gap-4 py-4">
              <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -186,11 +188,11 @@ export default function ProfileSetupModal() {
              </p>
              
              <div className="w-full space-y-3">
-                {/* DÜZELTİLMİŞ BUTON */}
+                {/* ONAY LİNKİNİ AÇAN BUTON */}
                 <Button 
                     type="button"
                     className="w-full py-6 text-base"
-                    onClick={handleOpenApprovalUrl}
+                    onClick={openApprovalLink}
                 >
                     <ExternalLink className="mr-2 h-5 w-5" />
                     Warpcast'i Aç ve Onayla
@@ -209,7 +211,7 @@ export default function ProfileSetupModal() {
              </div>
            </div>
         ) : (
-          // --- STEP 3: TAMAMLA ---
+          // --- ADIM 3: TAMAMLA ---
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
