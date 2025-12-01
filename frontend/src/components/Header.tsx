@@ -10,10 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ModeToggle } from './mode-toggle'; // <--- YENİ EKLENDİ
 
 interface HeaderProps {
   onOpenScheduler?: () => void;
-  user?: any; // Eski tasarımda user prop'u vardı, uyumluluk için ekliyoruz
+  user?: any;
 }
 
 export default function Header({ onOpenScheduler }: HeaderProps) {
@@ -21,32 +22,30 @@ export default function Header({ onOpenScheduler }: HeaderProps) {
   const disconnect = useDisconnectUser();
 
   const handleLogout = async () => {
-      // 1. Veritabanından bağlantıyı kes (Signer'ı sil)
       try {
         await disconnect.mutateAsync();
       } catch (e) {
         console.error("Logout error:", e);
       }
-      
-      // 2. Yerel verileri temizle
       localStorage.clear();
       sessionStorage.clear();
-      
-      // 3. Sayfayı yenile (Login ekranına düşmesi için)
       window.location.reload();
   };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
-        <div className="flex items-center gap-2 font-bold text-xl">
+        <div className="flex items-center gap-2 font-bold text-xl bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
+          {/* Logo rengini de biraz daha havalı yaptık */}
           <span>📢 AutoShout</span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* onOpenScheduler varsa butonu göster (Dashboard'dan geliyorsa) */}
+          {/* --- Tema Değiştirme Butonu Buraya Eklendi --- */}
+          <ModeToggle /> 
+
           {onOpenScheduler && (
-            <Button size="sm" onClick={onOpenScheduler} className="gap-1">
+            <Button size="sm" onClick={onOpenScheduler} className="gap-1 bg-purple-600 hover:bg-purple-700 text-white border-0">
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">New Cast</span>
             </Button>
@@ -55,8 +54,7 @@ export default function Header({ onOpenScheduler }: HeaderProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <Avatar className="h-8 w-8">
-                  {/* Profil resmi varsa göster, yoksa baş harfler */}
+                <Avatar className="h-8 w-8 border-2 border-purple-100 dark:border-purple-900">
                   <AvatarImage src={`https://warpcast.com/avatar/${profile?.farcasterHandle}`} />
                   <AvatarFallback>{profile?.name?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
