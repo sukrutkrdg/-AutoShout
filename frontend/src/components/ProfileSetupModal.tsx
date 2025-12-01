@@ -21,11 +21,30 @@ export default function ProfileSetupModal() {
   const [isApproved, setIsApproved] = useState(false);
   const [isLoadingSigner, setIsLoadingSigner] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  
+  // Frame Context State
+  const [isFrameContext, setIsFrameContext] = useState(false);
 
   // Polling interval referansı (temizlemek için)
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
 
   const saveProfile = useSaveCallerUserProfile();
+
+  // Frame Context Kontrolü
+  useEffect(() => {
+    const checkContext = async () => {
+      try {
+        const context = await sdk.context;
+        if (context) {
+          setIsFrameContext(true);
+        }
+      } catch (e) {
+        // Context alınamazsa frame dışındayız demektir, hata basmaya gerek yok
+        console.debug("Not in Farcaster frame context");
+      }
+    };
+    checkContext();
+  }, []);
 
   // Mevcut profil varsa state'i doldur
   useEffect(() => {
@@ -209,9 +228,7 @@ export default function ProfileSetupModal() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                        {/* DÜZELTME: Bu kısım Button değil 'a' etiketi oldu.
-                            Bu sayede tıklanınca kesinlikle linki açar.
-                        */}
+                        {/* DÜZELTME: isFrameContext kullanılarak Promise hatası giderildi */}
                         <a 
                             href={approvalUrl}
                             target="_blank" 
@@ -219,7 +236,7 @@ export default function ProfileSetupModal() {
                             className={cn(buttonVariants({ variant: "default" }), "w-full sm:order-2 cursor-pointer")}
                             onClick={(e) => {
                                 // Eğer Frame içindeysek SDK ile açmayı dene
-                                if (sdk.context) {
+                                if (isFrameContext) {
                                     e.preventDefault();
                                     sdk.actions.openUrl(approvalUrl);
                                 }
