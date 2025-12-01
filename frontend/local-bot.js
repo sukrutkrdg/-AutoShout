@@ -77,26 +77,28 @@ async function checkAndPublish() {
                         continue;
                     }
 
-                    // --- RESİM KONTROLÜ VE DÜZELTME ---
+                    // --- RESİM KONTROLÜ ---
                     const embeds = [];
                     if (post.media_url) {
                         console.log(`   🖼️ Resim bulundu: ${post.media_url}`);
                         embeds.push({ url: post.media_url });
                     }
 
-                    // Cast Seçeneklerini Hazırla
-                    // Eğer resim yoksa 'embeds' alanını HİÇ göndermiyoruz.
+                    // --- DÜZELTME BURADA ---
+                    // Parametreleri tek obje değil, ayrı ayrı gönderiyoruz.
+                    // Eğer resim yoksa, 3. parametre (options) boş gidebilir veya hiç gitmeyebilir.
+                    
                     const castOptions = {};
                     if (embeds.length > 0) {
                         castOptions.embeds = embeds;
                     }
 
-                    // Farcaster'a Gönder
                     await neynarClient.publishCast(
-                        userProfile.signer_uuid, // 1. Signer UUID
-                        post.content,            // 2. Metin
-                        castOptions              // 3. Seçenekler (Sadece gerekirse embeds içerir)
+                        userProfile.signer_uuid, // 1. Parametre: UUID
+                        post.content,            // 2. Parametre: Yazı
+                        castOptions              // 3. Parametre: Seçenekler (Resim vb.)
                     );
+                    // -----------------------
 
                     console.log(`   ✅ GÖNDERİLDİ!`);
 
