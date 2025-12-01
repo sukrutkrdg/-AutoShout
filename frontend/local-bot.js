@@ -3,36 +3,30 @@ import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
 
 // --- Ayarları Yükle ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-// .env dosyasını bul
-let envPath = path.resolve(__dirname, '.env');
-if (!fs.existsSync(envPath)) {
-    envPath = path.resolve(__dirname, '../.env');
-}
-
-if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-}
-
-console.log("\n🤖 AutoShout Akıllı Bot Başlatılıyor...");
+console.log("\n🤖 AutoShout Akıllı Bot (Çok Kullanıcılı Mod) Başlatılıyor...");
 
 // --- Kontroller ---
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-// Hem Service Role hem Anon key'i deneyelim (hangisi varsa)
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY; 
+// Yazma yetkisi için Service Role Key şart
+const SUPABASE_ADMIN_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; 
 const NEYNAR_KEY = process.env.NEYNAR_API_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY || !NEYNAR_KEY) {
-    console.error("🚨 EKSİK DEĞİŞKENLER! .env dosyanızı kontrol edin.");
+// Not: Artık NEYNAR_SIGNER_UUID'ye ihtiyacımız yok, çünkü veritabanından dinamik çekeceğiz.
+
+if (!SUPABASE_ADMIN_KEY) {
+    console.error("🚨 HATA: 'SUPABASE_SERVICE_ROLE_KEY' eksik! (.env dosyasını kontrol et)");
     process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// --- Bağlantılar ---
+// Service Role Key ile Supabase Client oluştur (RLS bypass)
+const supabase = createClient(SUPABASE_URL, SUPABASE_ADMIN_KEY);
 const neynarClient = new NeynarAPIClient(new Configuration({ apiKey: NEYNAR_KEY }));
 const processingCache = new Set();
 
@@ -41,7 +35,7 @@ async function checkAndPublish() {
     const timeString = new Date().toLocaleTimeString('tr-TR');
 
     try {
-        // 1. Bekleyen gönderileri çek
+        // 1. Veritabanından "Zamanı Gelmiş" ve "Pending" olanları çek
         const { data: posts, error } = await supabase
             .from('posts')
             .select('*')
@@ -54,59 +48,82 @@ async function checkAndPublish() {
         }
 
         if (posts && posts.length > 0) {
-            console.log(`\n🚀 [${timeString}] ${posts.length} gönderi işleniyor...`);
+            console.log(`\n🚀 [${timeString}] ${posts.length} adet işlem bekleyen gönderi var.`);
 
             for (const post of posts) {
+                // Çifte işlem koruması
                 if (processingCache.has(post.id)) continue;
                 processingCache.add(post.id);
 
-                console.log(`   🔍 İşleniyor: ID ${post.id}`);
+                console.log(`   🔍 İşleniyor: ID ${post.id} (Kullanıcı FID: ${post.user_fid})`);
 
                 try {
-                    // Kullanıcı Anahtarını Al
+                    // --- ADIM 1: KULLANICININ SIGNER ANAHTARINI BUL ---
+                    // Gönderiyi kim planladıysa onun yetki anahtarını çekiyoruz
                     const { data: userProfile, error: profileError } = await supabase
                         .from('profiles')
                         .select('signer_uuid')
                         .eq('fid', post.user_fid)
                         .single();
 
-                    if (profileError || !userProfile?.signer_uuid) {
-                        console.error(`   ❌ Signer Yok!`);
+                    if (profileError || !userProfile || !userProfile.signer_uuid) {
+                        console.error(`   ❌ HATA: Kullanıcının (FID: ${post.user_fid}) Signer anahtarı bulunamadı!`);
+                        // Anahtarı olmayan gönderiyi failed yap ki sürekli denemesin
                         await supabase.from('posts').update({ status: 'failed' }).eq('id', post.id);
                         processingCache.delete(post.id);
-                        continue;
+                        continue; // Sonraki gönderiye geç
                     }
 
-                    // --- RESİM KONTROLÜ (Embeds) ---
-                    const embeds = [];
-                    if (post.media_url) {
-                        console.log(`   🖼️ Resim bulundu: ${post.media_url}`);
-                        embeds.push({ url: post.media_url });
+                    const userSignerUuid = userProfile.signer_uuid;
+                    // -------------------------------------------------
+
+                    let shouldPublish = true;
+
+                    // --- ADIM 2: AKILLI KONTROL (Farcaster'da var mı?) ---
+                    try {
+                        if (post.user_fid) {
+                            // Neynar API ile kullanıcının son gönderilerini kontrol et
+                            // Bu adım duplicate (tekrar) gönderimi engellemek için opsiyonel bir güvenlik katmanıdır.
+                            const feed = await neynarClient.fetchCastsForUser(post.user_fid, { limit: 10 });
+                            
+                            const alreadyPosted = feed.casts.some(cast => 
+                                cast.text.trim() === post.content.trim()
+                            );
+
+                            if (alreadyPosted) {
+                                console.log(`   ⚠️ BU GÖNDERİ ZATEN FARCASTER'DA VAR! (Tekrar gönderilmeyecek)`);
+                                shouldPublish = false;
+                            }
+                        }
+                    } catch (apiCheckError) {
+                        console.warn(`   ⚠️ Farcaster kontrolü yapılamadı, normal gönderim denenecek.`);
                     }
 
-                    // --- DOĞRU PARAMETRE YAPISI ---
-                    // Opsiyonları hazırla
-                    const castOptions = {};
-                    if (embeds.length > 0) {
-                        castOptions.embeds = embeds;
+                    // --- ADIM 3: GÖNDERİM (Kullanıcının Anahtarıyla) ---
+                    if (shouldPublish) {
+                        await neynarClient.publishCast({
+                            signerUuid: userSignerUuid, // <--- KULLANICININ ONAYLANMIŞ ANAHTARI
+                            text: post.content,
+                        });
+                        console.log(`   ✅ Cast başarıyla gönderildi.`);
                     }
 
-                    // Neynar'a gönder: (UUID, Text, Options)
-                    await neynarClient.publishCast(
-                        userProfile.signer_uuid, 
-                        post.content, 
-                        castOptions
-                    );
+                    // --- ADIM 4: DURUM GÜNCELLEME ---
+                    const { error: updateError } = await supabase
+                        .from('posts')
+                        .update({ status: 'published' })
+                        .eq('id', post.id);
 
-                    console.log(`   ✅ GÖNDERİLDİ!`);
+                    if (updateError) {
+                        console.error(`   ❌ DB Güncelleme Hatası:`, updateError.message);
+                    } else {
+                        console.log(`   ✅ Veritabanı 'published' olarak işaretlendi.`);
+                        processingCache.delete(post.id);
+                    }
 
-                    // DB Güncelle
-                    await supabase.from('posts').update({ status: 'published' }).eq('id', post.id);
-                    
                 } catch (err) {
-                    console.error(`   ❌ Hata:`, err.message || err);
+                    console.error(`   ❌ İşlem Hatası (ID: ${post.id}):`, err.message);
                     await supabase.from('posts').update({ status: 'failed' }).eq('id', post.id);
-                } finally {
                     processingCache.delete(post.id);
                 }
             }
@@ -117,6 +134,6 @@ async function checkAndPublish() {
     }
 }
 
-// Döngü
+// --- DÖNGÜ ---
 checkAndPublish();
-setInterval(checkAndPublish, 60 * 1000);
+setInterval(checkAndPublish, 60 * 1000); // Her dakika kontrol et

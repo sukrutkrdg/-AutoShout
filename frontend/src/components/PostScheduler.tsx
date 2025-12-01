@@ -69,13 +69,13 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
             const filePath = `${fileName}`;
 
             const { error: uploadError } = await supabase.storage
-                .from('images') // Bucket adının 'images' olduğundan emin ol
+                .from('image') // Bucket adının 'images' olduğundan emin ol
                 .upload(filePath, mediaFile);
 
             if (uploadError) throw new Error("Upload failed: " + uploadError.message);
 
             // B) Yüklenen resmin linkini al
-            const { data } = supabase.storage.from('images').getPublicUrl(filePath);
+            const { data } = supabase.storage.from('image').getPublicUrl(filePath);
             finalMediaUrl = data.publicUrl;
         }
 
