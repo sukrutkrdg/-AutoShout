@@ -6,8 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Loader2, Upload, X } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Supabase eklendi
-import { toast } from 'sonner'; // Hata mesajları için
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 
 interface PostSchedulerProps {
   onClose: () => void;
@@ -18,32 +18,35 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
   const [content, setContent] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
+  
+  // Resim Yönetimi için State'ler
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false); // Yükleme durumu
+  const [isUploading, setIsUploading] = useState(false);
 
+  // 1. Resmi Seçince Ön İzlemeyi Oluşturan Fonksiyon
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Boyut kontrolü (örnek: 5MB)
-      if (file.size > 5 * 1024 * 1024) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB Limit
           toast.error("File size too large (max 5MB)");
           return;
       }
       setMediaFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMediaPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      
+      // Ön izleme (Preview) oluşturma mantığı
+      const objectUrl = URL.createObjectURL(file);
+      setMediaPreview(objectUrl);
     }
   };
 
+  // 2. Resmi Kaldırma Fonksiyonu
   const removeMedia = () => {
     setMediaFile(null);
     setMediaPreview(null);
   };
 
+  // 3. Gönderme (Upload + Database Kayıt) Fonksiyonu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim() && !mediaFile) {
@@ -55,43 +58,36 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
         return;
     }
 
-    setIsUploading(true); // Yükleme başladı
-    let uploadedMediaUrl = undefined;
+    setIsUploading(true);
+    let finalMediaUrl = undefined;
 
     try {
-        // 1. Resmi Supabase Storage'a Yükle
+        // A) Eğer resim varsa önce Supabase Storage'a yükle
         if (mediaFile) {
             const fileExt = mediaFile.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `${fileName}`;
 
             const { error: uploadError } = await supabase.storage
-                .from('images') // 1. Adımda oluşturduğumuz bucket adı
+                .from('images') // Bucket adının 'images' olduğundan emin ol
                 .upload(filePath, mediaFile);
 
-            if (uploadError) {
-                throw new Error("Image upload failed: " + uploadError.message);
-            }
+            if (uploadError) throw new Error("Upload failed: " + uploadError.message);
 
-            // 2. Resmin Public URL'ini al
-            const { data } = supabase.storage
-                .from('images')
-                .getPublicUrl(filePath);
-            
-            uploadedMediaUrl = data.publicUrl;
-            console.log("Image uploaded:", uploadedMediaUrl);
+            // B) Yüklenen resmin linkini al
+            const { data } = supabase.storage.from('images').getPublicUrl(filePath);
+            finalMediaUrl = data.publicUrl;
         }
 
-        // 3. Postu Planla (URL ile birlikte)
+        // C) Postu Planla (URL'i veritabanına kaydet)
         const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
-        const scheduledTimeMs = dateTime.getTime();
-
+        
         createPost.mutate(
           {
             id: `post_${Date.now()}`,
             content: content.trim(),
-            mediaUrl: uploadedMediaUrl, // URL buraya gidiyor
-            scheduledTime: scheduledTimeMs,
+            mediaUrl: finalMediaUrl, // Link buraya gidiyor
+            scheduledTime: dateTime.getTime(),
             status: 'pending',
             createdAt: Date.now(),
             updatedAt: Date.now(),
@@ -120,61 +116,70 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Schedule New Cast</DialogTitle>
           <DialogDescription>
-            Specify the content and time you want to share on Farcaster.
+            Share your thoughts with the Farcaster community.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {/* İçerik Alanı */}
           <div className="space-y-2">
             <Label htmlFor="content">Content</Label>
             <Textarea
               id="content"
-              placeholder="What's on your mind?"
+              placeholder="What's happening?"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={4}
-              className="resize-none"
+              className="resize-none focus-visible:ring-purple-500"
             />
-            <p className="text-xs text-muted-foreground text-right">{content.length} characters</p>
           </div>
 
+          {/* Medya (Resim) Alanı */}
           <div className="space-y-2">
             <Label>Media (Optional)</Label>
+            
             {mediaPreview ? (
-              <div className="relative group">
-                <img src={mediaPreview} alt="Preview" className="h-48 w-full rounded-lg object-cover border border-border" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+              // Resim Varsa: Önizlemeyi Göster
+              <div className="relative group rounded-lg overflow-hidden border border-border w-full h-48 bg-muted/30 flex items-center justify-center">
+                <img src={mediaPreview} alt="Preview" className="h-full w-auto object-contain" />
+                
+                {/* Kaldırma Butonu */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
                       onClick={removeMedia}
+                      className="gap-2"
                     >
-                      <X className="h-4 w-4 mr-2" /> Remove Image
+                      <X className="h-4 w-4" /> Remove Image
                     </Button>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 hover:bg-accent/50 transition-colors">
-                <label htmlFor="media" className="cursor-pointer text-center w-full">
-                  <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium text-foreground">Click to upload image</p>
-                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF up to 5MB</p>
-                  <input
+              // Resim Yoksa: Yükleme Alanını Göster
+              <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 hover:bg-accent/50 transition-colors cursor-pointer relative">
+                <input
                     id="media"
                     type="file"
                     accept="image/*"
                     onChange={handleMediaChange}
-                    className="hidden"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
                   />
-                </label>
+                <div className="text-center">
+                  <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium text-foreground">Click to upload image</p>
+                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF up to 5MB</p>
+                </div>
               </div>
             )}
           </div>
 
+          {/* Tarih ve Saat */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
@@ -199,13 +204,18 @@ export default function PostScheduler({ onClose }: PostSchedulerProps) {
             </div>
           </div>
 
+          {/* Butonlar */}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-purple-600 hover:bg-purple-700 text-white">
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isUploading ? 'Uploading...' : 'Schedule Cast'}
+            <Button type="submit" disabled={isLoading} className="bg-purple-600 hover:bg-purple-700 text-white min-w-[120px]">
+              {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isUploading ? 'Uploading...' : 'Saving...'}
+                  </>
+              ) : 'Schedule Cast'}
             </Button>
           </div>
         </form>

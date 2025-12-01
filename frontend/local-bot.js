@@ -9,6 +9,7 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// .env dosyasını bul
 let envPath = path.resolve(__dirname, '.env');
 if (!fs.existsSync(envPath)) {
     envPath = path.resolve(__dirname, '../.env');
@@ -16,14 +17,13 @@ if (!fs.existsSync(envPath)) {
 
 if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
-} else {
-    console.warn("⚠️ .env bulunamadı, sistem değişkenleri kullanılacak.");
 }
 
 console.log("\n🤖 AutoShout Akıllı Bot Başlatılıyor...");
 
 // --- Kontroller ---
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+// Hem Service Role hem Anon key'i deneyelim (hangisi varsa)
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY; 
 const NEYNAR_KEY = process.env.NEYNAR_API_KEY;
 
@@ -77,21 +77,21 @@ async function checkAndPublish() {
                         continue;
                     }
 
-                    // --- RESİM KONTROLÜ ---
+                    // --- RESİM KONTROLÜ (Embeds) ---
                     const embeds = [];
                     if (post.media_url) {
                         console.log(`   🖼️ Resim bulundu: ${post.media_url}`);
                         embeds.push({ url: post.media_url });
                     }
 
-                    // --- DÜZELTME BURADA: Parametreleri Ayrı Ayrı Gönderiyoruz ---
+                    // --- DOĞRU PARAMETRE YAPISI ---
+                    // Opsiyonları hazırla
                     const castOptions = {};
                     if (embeds.length > 0) {
                         castOptions.embeds = embeds;
                     }
 
-                    // Hatalı Kod: await neynarClient.publishCast({ ... })  <- SİLİNDİ
-                    // Doğru Kod: (uuid, text, options)
+                    // Neynar'a gönder: (UUID, Text, Options)
                     await neynarClient.publishCast(
                         userProfile.signer_uuid, 
                         post.content, 
@@ -100,16 +100,13 @@ async function checkAndPublish() {
 
                     console.log(`   ✅ GÖNDERİLDİ!`);
 
-                    // DB Güncelle (Başarılı)
+                    // DB Güncelle
                     await supabase.from('posts').update({ status: 'published' }).eq('id', post.id);
-                    processingCache.delete(post.id);
-
-                } catch (err) {
-                    // Hata Detayını Görelim
-                    console.error(`   ❌ Yayınlama Hatası:`, err.response?.data || err.message || err);
                     
-                    // DB Güncelle (Hatalı)
+                } catch (err) {
+                    console.error(`   ❌ Hata:`, err.message || err);
                     await supabase.from('posts').update({ status: 'failed' }).eq('id', post.id);
+                } finally {
                     processingCache.delete(post.id);
                 }
             }
