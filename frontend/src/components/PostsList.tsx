@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Clock, CheckCircle2, XCircle, Trash2, Image } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Trash2, ExternalLink } from 'lucide-react';
 import type { ScheduledPost, PostStatus } from '../lib/types';
 
 interface PostsListProps {
@@ -108,10 +108,25 @@ export default function PostsList({ posts }: PostsListProps) {
             </CardHeader>
             <CardContent>
               <p className="whitespace-pre-wrap text-sm">{post.content}</p>
-              {post.media && (
-                <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                  <Image className="h-4 w-4" />
-                  <span>Media attached</span>
+              
+              {/* DÜZELTME: post.mediaUrl kontrol ediliyor */}
+              {post.mediaUrl && (
+                <div className="mt-3">
+                  <a 
+                    href={post.mediaUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block group relative overflow-hidden rounded-md border w-fit"
+                  >
+                    <img 
+                      src={post.mediaUrl} 
+                      alt="Cast media" 
+                      className="h-32 w-auto object-cover transition-transform group-hover:scale-105" 
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <ExternalLink className="text-white opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 drop-shadow-md" />
+                    </div>
+                  </a>
                 </div>
               )}
             </CardContent>
