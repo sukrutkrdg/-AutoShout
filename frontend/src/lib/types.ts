@@ -1,4 +1,3 @@
-
 export type PostStatus = 'pending' | 'published' | 'failed';
 
 export interface UserProfile {
@@ -11,7 +10,7 @@ export interface UserProfile {
 export interface ScheduledPost {
   id: string;
   content: string;
-  mediaUrl?: string; // ARTIK DOSYA DEĞİL, URL SAKLIYORUZ
+  mediaUrl?: string; // media yerine mediaUrl kullanıyoruz
   scheduledTime: number; 
   status: PostStatus;
   createdAt: number;

@@ -8,7 +8,6 @@ import { supabase } from '../lib/supabase';
 async function getCurrentFid(): Promise<number> {
     const context = await sdk.context;
     
-    // Dev modunda tarayıcıda test ederken hata almamak için sahte ID (Sadece development için)
     if ((!context || !context.user) && import.meta.env.DEV) return 1; 
     
     if (!context || !context.user) throw new Error("User session not found");
@@ -29,19 +28,17 @@ export function useGetCallerUserProfile() {
         .single();
       
       if (error) {
-        if (error.code === 'PGRST116') return null; // Kayıt yoksa null dön
+        if (error.code === 'PGRST116') return null; 
         console.error(error);
         return null;
       }
 
-      // Veritabanı (snake_case) -> Uygulama (camelCase) Eşleşmesi
       if (data) {
         return {
-            name: data.display_name,       // DB: display_name -> App: name
-            farcasterHandle: data.username,// DB: username -> App: farcasterHandle
-            isPremium: data.is_premium,    // DB: is_premium -> App: isPremium
+            name: data.display_name,       
+            farcasterHandle: data.username,
+            isPremium: data.is_premium,    
             createdAt: new Date(data.created_at).getTime(),
-            // Eğer signer_uuid varsa onu da dönüyoruz (opsiyonel)
             signerUuid: data.signer_uuid 
         } as UserProfile & { signerUuid?: string };
       }
@@ -63,10 +60,9 @@ export function useSaveCallerUserProfile() {
         .from('profiles')
         .upsert({
             fid: fid,
-            username: profile.farcasterHandle, // App -> DB
-            display_name: profile.name,        // App -> DB
+            username: profile.farcasterHandle, 
+            display_name: profile.name,        
             is_premium: profile.isPremium,
-            // Signer UUID varsa kaydet
             ...(profile.signerUuid && { 
                 signer_uuid: profile.signerUuid,
                 signer_status: 'approved' 
@@ -85,14 +81,12 @@ export function useSaveCallerUserProfile() {
   });
 }
 
-// --- BAĞLANTIYI KESME (ÇIKIŞ) FONKSİYONU ---
 export function useDisconnectUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
       const fid = await getCurrentFid();
-      // Veritabanındaki signer_uuid alanını temizle
       const { error } = await supabase
         .from('profiles')
         .update({ signer_uuid: null, signer_status: null })
@@ -126,8 +120,7 @@ export function useGetUserScheduledPosts() {
         return (data || []).map((p: any) => ({
             id: p.id,
             content: p.content,
-            // DEĞİŞİKLİK 1: Artık mediaUrl string olarak alınıyor
-            mediaUrl: p.media_url || undefined, 
+            mediaUrl: p.media_url || undefined, // DÜZELTİLDİ: media -> mediaUrl
             scheduledTime: Number(p.scheduled_time), 
             status: p.status,
             createdAt: new Date(p.created_at).getTime(),
@@ -145,7 +138,6 @@ export function useCreateScheduledPost() {
     mutationFn: async (post: ScheduledPost) => {
       const fid = await getCurrentFid();
       
-      // Profil kontrolü
       const { data: profile } = await supabase.from('profiles').select('fid').eq('fid', fid).single();
       if (!profile) {
           await supabase.from('profiles').insert({ fid, username: 'user', display_name: 'User' });
@@ -157,8 +149,7 @@ export function useCreateScheduledPost() {
             user_fid: fid,
             content: post.content,
             scheduled_time: post.scheduledTime, 
-            // DEĞİŞİKLİK 2: mediaUrl, veritabanındaki media_url sütununa kaydediliyor
-            media_url: post.mediaUrl, 
+            media_url: post.mediaUrl, // DÜZELTİLDİ: mediaUrl veritabanına gidiyor
             status: 'pending'
         });
 

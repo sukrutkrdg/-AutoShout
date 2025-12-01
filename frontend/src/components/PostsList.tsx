@@ -109,7 +109,7 @@ export default function PostsList({ posts }: PostsListProps) {
             <CardContent>
               <p className="whitespace-pre-wrap text-sm">{post.content}</p>
               
-              {/* DÜZELTME: post.mediaUrl kontrol ediliyor */}
+              {/* DÜZELTME: mediaUrl varsa resmi göster */}
               {post.mediaUrl && (
                 <div className="mt-3">
                   <a 
