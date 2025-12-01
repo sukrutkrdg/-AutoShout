@@ -84,30 +84,31 @@ async function checkAndPublish() {
                         embeds.push({ url: post.media_url });
                     }
 
-                    // --- DÜZELTME BURADA ---
-                    // Parametreleri tek obje değil, ayrı ayrı gönderiyoruz.
-                    // Eğer resim yoksa, 3. parametre (options) boş gidebilir veya hiç gitmeyebilir.
-                    
+                    // --- DÜZELTME BURADA: Parametreleri Ayrı Ayrı Gönderiyoruz ---
                     const castOptions = {};
                     if (embeds.length > 0) {
                         castOptions.embeds = embeds;
                     }
 
+                    // Hatalı Kod: await neynarClient.publishCast({ ... })  <- SİLİNDİ
+                    // Doğru Kod: (uuid, text, options)
                     await neynarClient.publishCast(
-                        userProfile.signer_uuid, // 1. Parametre: UUID
-                        post.content,            // 2. Parametre: Yazı
-                        castOptions              // 3. Parametre: Seçenekler (Resim vb.)
+                        userProfile.signer_uuid, 
+                        post.content, 
+                        castOptions
                     );
-                    // -----------------------
 
                     console.log(`   ✅ GÖNDERİLDİ!`);
 
-                    // DB Güncelle
+                    // DB Güncelle (Başarılı)
                     await supabase.from('posts').update({ status: 'published' }).eq('id', post.id);
                     processingCache.delete(post.id);
 
                 } catch (err) {
-                    console.error(`   ❌ Hata:`, err.message || err);
+                    // Hata Detayını Görelim
+                    console.error(`   ❌ Yayınlama Hatası:`, err.response?.data || err.message || err);
+                    
+                    // DB Güncelle (Hatalı)
                     await supabase.from('posts').update({ status: 'failed' }).eq('id', post.id);
                     processingCache.delete(post.id);
                 }
