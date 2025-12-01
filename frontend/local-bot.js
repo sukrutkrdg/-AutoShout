@@ -84,12 +84,13 @@ async function checkAndPublish() {
                         embeds.push({ url: post.media_url });
                     }
 
-                    // Farcaster'a Gönder
-                    await neynarClient.publishCast({
-                        signerUuid: userProfile.signer_uuid,
-                        text: post.content,
-                        embeds: embeds.length > 0 ? embeds : undefined // Resim varsa ekle
-                    });
+                    // --- DÜZELTİLMİŞ KOD ---
+                    // Farcaster'a Gönder (Parametre sırası düzeltildi)
+                    await neynarClient.publishCast(
+                        userProfile.signer_uuid, // 1. Signer UUID
+                        post.content,            // 2. Metin
+                        { embeds: embeds }       // 3. Seçenekler (Embeds)
+                    );
 
                     console.log(`   ✅ GÖNDERİLDİ!`);
 

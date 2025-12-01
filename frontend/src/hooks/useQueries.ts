@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 async function getCurrentFid(): Promise<number> {
     const context = await sdk.context;
     
-    // Dev modunda tarayıcıda test ederken haata almamak için sahte ID (Sadece development için)
+    // Dev modunda tarayıcıda test ederken hata almamak için sahte ID (Sadece development için)
     if ((!context || !context.user) && import.meta.env.DEV) return 1; 
     
     if (!context || !context.user) throw new Error("User session not found");
@@ -42,7 +42,6 @@ export function useGetCallerUserProfile() {
             isPremium: data.is_premium,    // DB: is_premium -> App: isPremium
             createdAt: new Date(data.created_at).getTime(),
             // Eğer signer_uuid varsa onu da dönüyoruz (opsiyonel)
-            // Bu alana UserProfile interface'inde ihtiyacın olabilir
             signerUuid: data.signer_uuid 
         } as UserProfile & { signerUuid?: string };
       }
@@ -56,12 +55,10 @@ export function useGetCallerUserProfile() {
 export function useSaveCallerUserProfile() {
   const queryClient = useQueryClient();
 
-  // Parametre tipi: UserProfile & { signerUuid?: string } olarak genişletildi
   return useMutation({
     mutationFn: async (profile: UserProfile & { signerUuid?: string }) => {
       const fid = await getCurrentFid();
       
-      // Yazarken de tam tersi eşleştirme yapıyoruz
       const { error } = await supabase
         .from('profiles')
         .upsert({
@@ -69,7 +66,7 @@ export function useSaveCallerUserProfile() {
             username: profile.farcasterHandle, // App -> DB
             display_name: profile.name,        // App -> DB
             is_premium: profile.isPremium,
-            // YENİ EKLENEN: Signer UUID varsa kaydet
+            // Signer UUID varsa kaydet
             ...(profile.signerUuid && { 
                 signer_uuid: profile.signerUuid,
                 signer_status: 'approved' 
@@ -109,7 +106,6 @@ export function useDisconnectUser() {
     },
     onError: (error: Error) => {
       console.error('Logout error:', error);
-      // Hata olsa bile kullanıcı arayüzden çıkabilsin diye hata basmıyoruz
     },
   });
 }
@@ -130,10 +126,8 @@ export function useGetUserScheduledPosts() {
         return (data || []).map((p: any) => ({
             id: p.id,
             content: p.content,
-            // Medya varsa url objesi oluştur, yoksa undefined
-            media: p.media_url ? { url: p.media_url } : undefined,
-            // DB'den bigint (sayı) geliyor, bunu Date objesine veya doğrudan sayıya çeviriyoruz.
-            // Eğer DB'de bigint ise p.scheduled_time zaten bir sayı veya string sayı olabilir.
+            // DEĞİŞİKLİK 1: Artık mediaUrl string olarak alınıyor
+            mediaUrl: p.media_url || undefined, 
             scheduledTime: Number(p.scheduled_time), 
             status: p.status,
             createdAt: new Date(p.created_at).getTime(),
@@ -154,9 +148,6 @@ export function useCreateScheduledPost() {
       // Profil kontrolü
       const { data: profile } = await supabase.from('profiles').select('fid').eq('fid', fid).single();
       if (!profile) {
-          // Eğer profil yoksa varsayılan bir profil oluşturuyoruz.
-          // NOT: Bu durumda signer_uuid olmayacağı için bot bu postu atamaz.
-          // Kullanıcıyı profil oluşturmaya zorlamak daha iyi bir UX olabilir.
           await supabase.from('profiles').insert({ fid, username: 'user', display_name: 'User' });
       }
 
@@ -165,9 +156,9 @@ export function useCreateScheduledPost() {
         .insert({
             user_fid: fid,
             content: post.content,
-            // DÜZELTME: Veritabanında sütun tipi 'bigint' olduğu için
-            // buraya string (ISO) değil, sayısal değer (timestamp) gönderiyoruz.
             scheduled_time: post.scheduledTime, 
+            // DEĞİŞİKLİK 2: mediaUrl, veritabanındaki media_url sütununa kaydediliyor
+            media_url: post.mediaUrl, 
             status: 'pending'
         });
 

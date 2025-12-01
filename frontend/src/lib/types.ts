@@ -1,3 +1,4 @@
+
 export type PostStatus = 'pending' | 'published' | 'failed';
 
 export interface UserProfile {
@@ -10,10 +11,10 @@ export interface UserProfile {
 export interface ScheduledPost {
   id: string;
   content: string;
-  media?: Uint8Array; // Basitleştirildi, URL de olabilir
-  scheduledTime: number; // Timestamp (ms)
+  mediaUrl?: string; // ARTIK DOSYA DEĞİL, URL SAKLIYORUZ
+  scheduledTime: number; 
   status: PostStatus;
   createdAt: number;
   updatedAt: number;
-  userId: number; // Farcaster FID (Principal yerine)
+  userId: number;
 }
