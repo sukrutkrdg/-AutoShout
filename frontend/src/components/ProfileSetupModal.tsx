@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSaveCallerUserProfile, useGetCallerUserProfile } from '../hooks/useQueries';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, LogOut, Copy, Smartphone } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, Copy, Smartphone } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function ProfileSetupModal() {
   const { data: userProfile, isLoading: isProfileLoading } = useGetCallerUserProfile();
@@ -135,34 +136,6 @@ export default function ProfileSetupModal() {
       stopPolling();
   };
 
-  // --- GELİŞMİŞ MOBİL LİNK AÇMA ---
-  const openApprovalLink = () => {
-    if (!approvalUrl) return;
-
-    // 1. Mobil Uygulama Şeması (Deep Link)
-    let mobileUrl = approvalUrl;
-    if (approvalUrl.startsWith('https://client.farcaster.xyz/deeplinks/')) {
-        mobileUrl = approvalUrl.replace('https://client.farcaster.xyz/deeplinks/', 'warpcast://');
-    }
-
-    console.log("Attempting to open:", mobileUrl);
-
-    try {
-      // 2. Önce SDK ile açmayı dene (Farcaster Frame içindeysek en iyisi budur)
-      sdk.actions.openUrl(mobileUrl);
-    } catch (e) {
-      console.log("SDK failed, trying window methods...");
-      
-      // 3. SDK çalışmazsa (örneğin normal tarayıcıda), window.open dene
-      const opened = window.open(mobileUrl, '_blank');
-      
-      // 4. window.open da engellenirse (popup blocker), sayfayı yönlendir
-      if (!opened) {
-          window.location.href = mobileUrl;
-      }
-    }
-  };
-
   const copyLink = () => {
       if (approvalUrl) {
           navigator.clipboard.writeText(approvalUrl);
@@ -236,10 +209,24 @@ export default function ProfileSetupModal() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                        {/* Mobilde Ana Aksiyon: Uygulamayı Aç */}
-                        <Button onClick={openApprovalLink} className="w-full sm:order-2">
+                        {/* DÜZELTME: Bu kısım Button değil 'a' etiketi oldu.
+                            Bu sayede tıklanınca kesinlikle linki açar.
+                        */}
+                        <a 
+                            href={approvalUrl}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className={cn(buttonVariants({ variant: "default" }), "w-full sm:order-2 cursor-pointer")}
+                            onClick={(e) => {
+                                // Eğer Frame içindeysek SDK ile açmayı dene
+                                if (sdk.context) {
+                                    e.preventDefault();
+                                    sdk.actions.openUrl(approvalUrl);
+                                }
+                            }}
+                        >
                             <ExternalLink className="mr-2 h-4 w-4" /> Open Warpcast
-                        </Button>
+                        </a>
                         
                         {/* Masaüstü/Yedek: Linki Kopyala */}
                         <Button variant="outline" onClick={copyLink} className="w-full sm:order-1">
