@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, QrCode, CheckCircle2, ExternalLink, Copy, Smartphone } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, ExternalLink, Copy, Smartphone, CalendarClock, Image as ImageIcon, Zap } from 'lucide-react';
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -39,7 +39,6 @@ export default function ProfileSetupModal() {
           setIsFrameContext(true);
         }
       } catch (e) {
-        // Context alınamazsa frame dışındayız demektir, hata basmaya gerek yok
         console.debug("Not in Farcaster frame context");
       }
     };
@@ -94,12 +93,10 @@ export default function ProfileSetupModal() {
       const res = await fetch('/api/signer', { method: 'POST' });
       const data = await res.json();
       
-      console.log("🔥 API Response:", data);
-
       if (data.signer_uuid) {
           setSignerUuid(data.signer_uuid);
           
-          // Linki yakala (farklı isimlerle gelebilir)
+          // Linki yakala
           const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
           if (url) setApprovalUrl(url);
 
@@ -117,7 +114,6 @@ export default function ProfileSetupModal() {
   };
 
   const pollSignerStatus = async (uuid: string) => {
-    // Varsa eski polling'i temizle
     stopPolling();
 
     pollingInterval.current = setInterval(async () => {
@@ -125,7 +121,6 @@ export default function ProfileSetupModal() {
         const res = await fetch(`/api/signer?signer_uuid=${uuid}`);
         const data = await res.json();
         
-        // Link sonradan gelirse yakala (bazen gecikmeli gelir)
         if (!approvalUrl) {
             const url = data.signer_approval_url || data.link || data.url || data.signer_approval_link;
             if (url) setApprovalUrl(url);
@@ -133,13 +128,13 @@ export default function ProfileSetupModal() {
 
         if (data.status === 'approved') {
           setIsApproved(true);
-          stopPolling(); // Polling'i durdur
-          handleAutoSave(uuid); // Otomatik kaydet
+          stopPolling();
+          handleAutoSave(uuid); 
         }
       } catch (e) { console.error(e); }
     }, 2000); 
     
-    // 3 dakika sonra zaman aşımı
+    // 3 dakika zaman aşımı
     setTimeout(() => {
         if (isPolling) {
             stopPolling();
@@ -183,25 +178,62 @@ export default function ProfileSetupModal() {
   return (
     <Dialog open={true}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e: any) => e.preventDefault()}>
-        <DialogHeader>
-          <DialogTitle>Welcome! 👋</DialogTitle>
-          <DialogDescription>Create your profile to start using AutoShout.</DialogDescription>
-        </DialogHeader>
-
+        
         {!signerUuid ? (
-          // STEP 1: BAĞLANMA BUTONU
-          <div className="flex flex-col items-center gap-4 py-4">
-            <div className="text-center">
-               <p className="mb-2 text-sm text-muted-foreground">You need to connect your Farcaster account to schedule casts.</p>
+          // STEP 1: TANITIM VE BAĞLANMA EKRANI
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-center text-xl bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent font-bold">
+                Welcome to AutoShout 📢
+              </DialogTitle>
+              <DialogDescription className="text-center">
+                Automate your Farcaster presence with ease.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+                {/* Özellikler */}
+                <div className="grid gap-3 text-sm">
+                    <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/50">
+                        <CalendarClock className="h-5 w-5 text-purple-600 mt-0.5" />
+                        <div>
+                            <span className="font-semibold block">Schedule Casts</span>
+                            Plan your posts ahead of time and let us handle the publishing.
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/50">
+                        <ImageIcon className="h-5 w-5 text-blue-600 mt-0.5" />
+                        <div>
+                            <span className="font-semibold block">Media Support</span>
+                            Easily upload and attach images to your scheduled casts.
+                        </div>
+                    </div>
+                </div>
+
+                {/* Ücret Uyarısı */}
+                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:bg-yellow-900/20 dark:border-yellow-800">
+                    <div className="flex items-start gap-3">
+                        <Zap className="h-5 w-5 text-yellow-600 mt-0.5" />
+                        <div className="text-xs text-yellow-800 dark:text-yellow-200">
+                            <span className="font-semibold block mb-1">One-time Connection Fee</span>
+                            Farcaster protocol may require a small fee (Warps) to approve this app as a signer. This goes to the network, not us.
+                        </div>
+                    </div>
+                </div>
+
+                <Button onClick={createSigner} disabled={isLoadingSigner} className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                  {isLoadingSigner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
+                  Connect Farcaster
+                </Button>
             </div>
-            <Button onClick={createSigner} disabled={isLoadingSigner} className="w-full" variant="outline">
-              {isLoadingSigner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
-              Connect Farcaster
-            </Button>
-          </div>
+          </>
         ) : !isApproved ? (
            // STEP 2: ONAY BEKLEME EKRANI
            <div className="flex flex-col items-center gap-4 py-2">
+             <DialogHeader>
+                <DialogTitle>Approve Signer</DialogTitle>
+             </DialogHeader>
+
              <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm font-medium">
                 <Loader2 className="h-4 w-4 animate-spin" /> 
                 <span>Waiting for Approval</span>
@@ -209,7 +241,6 @@ export default function ProfileSetupModal() {
              
              {approvalUrl ? (
                  <div className="w-full flex flex-col items-center gap-4">
-                    {/* QR Kod - Sadece Masaüstünde Göster (hidden sm:block) */}
                     <div className="bg-white p-2 rounded-lg border shadow-sm hidden sm:block">
                         <img 
                             src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(approvalUrl)}`} 
@@ -228,14 +259,12 @@ export default function ProfileSetupModal() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                        {/* DÜZELTME: isFrameContext kullanılarak Promise hatası giderildi */}
                         <a 
                             href={approvalUrl}
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className={cn(buttonVariants({ variant: "default" }), "w-full sm:order-2 cursor-pointer")}
+                            className={cn(buttonVariants({ variant: "default" }), "w-full sm:order-2 cursor-pointer bg-purple-600 hover:bg-purple-700")}
                             onClick={(e) => {
-                                // Eğer Frame içindeysek SDK ile açmayı dene
                                 if (isFrameContext) {
                                     e.preventDefault();
                                     sdk.actions.openUrl(approvalUrl);
@@ -245,7 +274,6 @@ export default function ProfileSetupModal() {
                             <ExternalLink className="mr-2 h-4 w-4" /> Open Warpcast
                         </a>
                         
-                        {/* Masaüstü/Yedek: Linki Kopyala */}
                         <Button variant="outline" onClick={copyLink} className="w-full sm:order-1">
                             <Copy className="mr-2 h-4 w-4" /> Copy Link
                         </Button>
@@ -264,22 +292,27 @@ export default function ProfileSetupModal() {
            </div>
         ) : (
           // STEP 3: PROFİL BİLGİLERİNİ TAMAMLA
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700">
-                <CheckCircle2 className="h-4 w-4" /> Account Connected!
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">Display Name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. John Doe" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="farcaster">Username</Label>
-              <Input id="farcaster" value={farcasterHandle} onChange={(e) => setFarcasterHandle(e.target.value)} required placeholder="john" />
-            </div>
-            <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
-              {saveProfile.isPending ? "Saving..." : "Complete Setup"}
-            </Button>
-          </form>
+          <>
+            <DialogHeader>
+                <DialogTitle>Profile Setup</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="flex items-center justify-center gap-2 rounded-md bg-green-100 p-2 text-sm text-green-700">
+                    <CheckCircle2 className="h-4 w-4" /> Account Connected!
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="name">Display Name</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. John Doe" />
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="farcaster">Username</Label>
+                <Input id="farcaster" value={farcasterHandle} onChange={(e) => setFarcasterHandle(e.target.value)} required placeholder="john" />
+                </div>
+                <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={saveProfile.isPending}>
+                {saveProfile.isPending ? "Saving..." : "Complete Setup"}
+                </Button>
+            </form>
+          </>
         )}
       </DialogContent>
     </Dialog>
