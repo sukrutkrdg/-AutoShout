@@ -1,18 +1,37 @@
 {
   "accountAssociation": {
-    "header": "eyJmaWQiOjI4NzI4NiwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDg0ODhiNkY5NThiMTVlQzQxZjZiNmMyRWY4MkFEQzEwNTc4NTU5NjkifQ",
+    "header": "eyJmaWQiOjI4NzI4NiwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDVmMzY1MDAwYjkyNDlFMWMzQTU3YmYxNWFCRDUxQTIyOWRiMjM1NzMifQ",
     "payload": "eyJkb21haW4iOiJhdXRvLXNob3V0LTV1NzUudmVyY2VsLmFwcCJ9",
-    "signature": "cDuT4JZJ291MGl33klWrIsuo9iqbpUvHoxOR+eS7sDwcMizxfYyPrQHaxAj/hYPFWsnCa4iBsOTP38OfpHcamxs="
+    "signature": "bdDszm59po1vwm+2MITufudiUsyrOmcavWbENDng0qJ38VWGlFX9GZdfmT893XFeTZqJH14QXi3zPl3Q6hL2Mxs="
   },
   "frame": {
+    "name": "Auto Shout",
     "version": "1",
-    "name": "Example Frame",
     "iconUrl": "https://auto-shout-5u75.vercel.app/icon.png",
     "homeUrl": "https://auto-shout-5u75.vercel.app",
     "imageUrl": "https://auto-shout-5u75.vercel.app/image.png",
-    "buttonTitle": "Check this out",
+    "buttonTitle": "Schedule Post",
     "splashImageUrl": "https://auto-shout-5u75.vercel.app/splash.png",
-    "splashBackgroundColor": "#eeccff",
-    "webhookUrl": "https://auto-shout-5u75.vercel.app/api/webhook"
+    "splashBackgroundColor": "#EECCFF",
+    "webhookUrl": "https://auto-shout-5u75.vercel.app/api/webhook",
+    "subtitle": "Automated Farcaster post scheduling app",
+    "description": "AutoShout allows you to schedule and automatically publish your casts at any date and time. Manage your content calendar effortlessly",
+    "primaryCategory": "productivity",
+    "screenshotUrls": [
+      "https://auto-shout-5u75.vercel.app/screenshot1.png"
+    ],
+    "heroImageUrl": "https://auto-shout-5u75.vercel.app/splash.png",
+    "tags": [
+      "schedule",
+      "automation",
+      "productivity",
+      "tools",
+      "cast"
+    ],
+    "tagline": "Automate Your Farcaster Posts",
+    "ogTitle": "AutoShout",
+    "ogDescription": "Schedule and automate your Farcaster casts",
+    "ogImageUrl": "https://auto-shout-5u75.vercel.app/icon.png",
+    "castShareUrl": "https://warpcast.com/~/frames/launch?url=https://auto-shout-5u75.vercel.app"
   }
 }
