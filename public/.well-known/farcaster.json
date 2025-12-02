@@ -14,7 +14,7 @@
     "splashImageUrl": "https://auto-shout-5u75.vercel.app/splash.png",
     "splashBackgroundColor": "#EECCFF",
     "webhookUrl": "https://auto-shout-5u75.vercel.app/api/webhook",
-    "subtitle": "Automated Farcaster post scheduling app",
+    "subtitle": "Automated Farcaster post",
     "description": "AutoShout allows you to schedule and automatically publish your casts at any date and time. Manage your content calendar effortlessly",
     "primaryCategory": "productivity",
     "screenshotUrls": [
