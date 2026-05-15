@@ -76,7 +76,10 @@ export function useSaveCallerUserProfile() {
       toast.success('Profile saved');
     },
     onError: (error: Error) => {
-      toast.error('Error: ' + error.message);
+      const msg = error.message.includes('Failed to fetch')
+        ? 'Database connection failed. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel settings.'
+        : 'Error: ' + error.message;
+      toast.error(msg);
     },
   });
 }

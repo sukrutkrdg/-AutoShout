@@ -36,7 +36,7 @@ export default function Dashboard({ user }: DashboardProps) {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       
       {/* EKLENDİ: Giriş yapılmamışsa modalı göster */}
-      {showSetupModal && <ProfileSetupModal />}
+      {showSetupModal && <ProfileSetupModal user={user} />}
 
       <div className="mb-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

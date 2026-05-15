@@ -8,10 +8,15 @@ import { Loader2, QrCode, CheckCircle2, ExternalLink, Copy, Smartphone, Calendar
 import sdk from '@farcaster/frame-sdk';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { FarcasterUser } from '@/lib/farcaster';
 
-export default function ProfileSetupModal() {
+interface ProfileSetupModalProps {
+  user?: FarcasterUser | null;
+}
+
+export default function ProfileSetupModal({ user }: ProfileSetupModalProps) {
   const { data: userProfile, isLoading: isProfileLoading } = useGetCallerUserProfile();
-  
+
   const [name, setName] = useState('');
   const [farcasterHandle, setFarcasterHandle] = useState('');
   
@@ -45,7 +50,7 @@ export default function ProfileSetupModal() {
     checkContext();
   }, []);
 
-  // Mevcut profil varsa state'i doldur
+  // Profil bilgilerini doldur: önce Supabase profili, yoksa Farcaster SDK verisi
   useEffect(() => {
     if (userProfile) {
       setName(userProfile.name || '');
@@ -54,8 +59,12 @@ export default function ProfileSetupModal() {
         setSignerUuid(userProfile.signerUuid);
         setIsApproved(true);
       }
+    } else if (!isProfileLoading && user) {
+      // Supabase'den profil gelmedi, Farcaster SDK'dan al
+      setName(user.displayName || '');
+      setFarcasterHandle(user.username || '');
     }
-  }, [userProfile]);
+  }, [userProfile, isProfileLoading, user]);
 
   // Component unmount olduğunda polling'i durdur
   useEffect(() => {
@@ -71,8 +80,8 @@ export default function ProfileSetupModal() {
   };
 
   const handleAutoSave = (approvedUuid: string) => {
-    const finalName = name.trim() || userProfile?.name || 'User';
-    const finalHandle = farcasterHandle.trim() || userProfile?.farcasterHandle || 'user';
+    const finalName = name.trim() || userProfile?.name || user?.displayName || 'User';
+    const finalHandle = farcasterHandle.trim() || userProfile?.farcasterHandle || user?.username || 'user';
 
     saveProfile.mutate({
       name: finalName,
