@@ -185,6 +185,16 @@ export function useDeleteScheduledPost() {
   });
 }
 
+function getStartOfCurrentWeek(): string {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sunday ... 6=Saturday
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - daysFromMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+  return startOfWeek.toISOString();
+}
+
 export function useGetWeeklyPostCount() {
   return useQuery({
     queryKey: ['weeklyPostCount'],
@@ -193,7 +203,8 @@ export function useGetWeeklyPostCount() {
         const { count, error } = await supabase
             .from('posts')
             .select('*', { count: 'exact', head: true })
-            .eq('user_fid', fid);
+            .eq('user_fid', fid)
+            .gte('created_at', getStartOfCurrentWeek());
         if (error) return 0;
         return count || 0;
     },
@@ -204,7 +215,24 @@ export function useGetRemainingWeeklyPosts() {
   return useQuery({
     queryKey: ['remainingWeeklyPosts'],
     queryFn: async () => {
-        return 100; 
+      const fid = await getCurrentFid();
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_premium')
+        .eq('fid', fid)
+        .single();
+
+      const limit = profile?.is_premium ? 100 : 10;
+
+      const { count, error } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_fid', fid)
+        .gte('created_at', getStartOfCurrentWeek());
+
+      if (error) return limit;
+      return Math.max(0, limit - (count || 0));
     },
   });
 }
